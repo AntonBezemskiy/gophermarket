@@ -27,12 +27,40 @@ func Register(res http.ResponseWriter, req *http.Request, regist repositories.Au
 
 	ok, token, err := regist.Register(req.Context(), authData.Login, authData.Password)
 	if !ok {
-		logger.ServerLog.Error("register new user error", zap.String("address", req.URL.String()), zap.String("error", "login is not unique"))
+		logger.ServerLog.Error("register of new user is failed", zap.String("address", req.URL.String()), zap.String("error", "login is not unique"))
 		http.Error(res, "login is not unique", http.StatusConflict)
 		return
 	}
 	if err != nil {
 		logger.ServerLog.Error("register new user error", zap.String("address", req.URL.String()), zap.String("error: ", error.Error(err)))
+		http.Error(res, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Для передачи аутентификационных данных использую механизм cookie
+	SetTokenCookie(res, token)
+	res.WriteHeader(200)
+}
+
+func Authentication(res http.ResponseWriter, req *http.Request, auth repositories.AuthInterface) {
+	res.Header().Set("Content-Type", "text/plain")
+	defer req.Body.Close()
+
+	var authData repositories.AuthData
+	if err := json.NewDecoder(req.Body).Decode(&authData); err != nil {
+		logger.ServerLog.Error("decode body error in Authentication handler", zap.String("address", req.URL.String()), zap.String("error", error.Error(err)))
+		http.Error(res, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	ok, token, err := auth.Authenticate(req.Context(), authData.Login, authData.Password)
+	if !ok {
+		logger.ServerLog.Error("authentication of user is failed", zap.String("address", req.URL.String()), zap.String("error", "login or password is wrong"))
+		http.Error(res, "login or password is wrong", http.StatusUnauthorized)
+		return
+	}
+	if err != nil {
+		logger.ServerLog.Error("authentication of user error", zap.String("address", req.URL.String()), zap.String("error: ", error.Error(err)))
 		http.Error(res, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -54,6 +82,13 @@ func NotFoundHandler() http.HandlerFunc {
 func RegisterHandler(regist repositories.AuthInterface) http.HandlerFunc {
 	fn := func(res http.ResponseWriter, req *http.Request) {
 		Register(res, req, regist)
+	}
+	return fn
+}
+
+func AuthenticationHandler(regist repositories.AuthInterface) http.HandlerFunc {
+	fn := func(res http.ResponseWriter, req *http.Request) {
+		Authentication(res, req, regist)
 	}
 	return fn
 }

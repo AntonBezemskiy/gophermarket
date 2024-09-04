@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 )
 
-var secretKey string = "defaultSecretKey"
+var secretKey = "defaultSecretKey"
 
 func SetSecretKey(newKey string) {
 	secretKey = newKey
@@ -16,7 +16,7 @@ func SetSecretKey(newKey string) {
 
 // В качестве id пользователя будет использоваться сгенерированный UUID (Universally Unique Identifier)
 // uuid.New() создает новое рандомное UUID или вызывает панику, кажется это может быть проблемой
-func getUserId() string {
+func getUserID() string {
 	id := uuid.New()
 	return id.String()
 }
@@ -37,7 +37,7 @@ func BuildJWTString(expireHour int) (string, error) {
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * time.Duration(expireHour))),
 		},
 		// собственное утверждение - идентификатор пользователя
-		UserID: getUserId(),
+		UserID: getUserID(),
 	})
 
 	// создаём строку токена
@@ -52,7 +52,7 @@ func BuildJWTString(expireHour int) (string, error) {
 
 // Получение Id пользователя из токена c проверкой заголовка алгоритма токена.
 // Заголовок должен совпадать с тем, который сервер использует для подписи и проверки токенов.
-func GetUserId(tokenString string) (string, error) {
+func GetUserID(tokenString string) (string, error) {
 	claims := &Claims{}
 	token, err := jwt.ParseWithClaims(tokenString, claims,
 		func(t *jwt.Token) (interface{}, error) {

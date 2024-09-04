@@ -33,6 +33,7 @@ func MetricRouter() chi.Router {
 
 	r.Route("/api/user", func(r chi.Router) {
 		r.Post("/register", logger.RequestLogger(handlers.RegisterHandler(nil)))
+		r.Post("/login", logger.RequestLogger(handlers.AuthenticationHandler(nil)))
 	})
 
 	// Определяем маршрут по умолчанию для некорректных запросов

@@ -11,9 +11,9 @@ func TestGetUserId(t *testing.T) {
 	tokenSuccess, err := BuildJWTString(1)
 	require.NoError(t, err)
 
-	gotOne, err := GetUserId(tokenSuccess)
+	gotOne, err := GetUserID(tokenSuccess)
 	require.NoError(t, err)
-	gotTwo, err := GetUserId(tokenSuccess)
+	gotTwo, err := GetUserID(tokenSuccess)
 	require.NoError(t, err)
 	assert.Equal(t, gotOne, gotTwo)
 }
