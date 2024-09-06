@@ -65,6 +65,7 @@ func TestAuthChecker(t *testing.T) {
 		r.ServeHTTP(w, request)
 
 		result := w.Result()
+		defer result.Body.Close()
 		assert.Equal(t, http.StatusOK, result.StatusCode)
 	}
 	// Случай неуспешной авторизации. Пользователь не отправил JWT в запросе
@@ -83,6 +84,7 @@ func TestAuthChecker(t *testing.T) {
 		r.ServeHTTP(w, request)
 
 		result := w.Result()
+		defer result.Body.Close()
 		assert.Equal(t, http.StatusUnauthorized, result.StatusCode)
 	}
 	// Случай неуспешной авторизации. Пользователь отправил неправильный JWT. JWT подписанный ключом, который отличается от ключа сервера
@@ -132,6 +134,7 @@ func TestAuthChecker(t *testing.T) {
 		r.ServeHTTP(w, request)
 
 		result := w.Result()
+		defer result.Body.Close()
 		assert.Equal(t, http.StatusUnauthorized, result.StatusCode)
 	}
 }
