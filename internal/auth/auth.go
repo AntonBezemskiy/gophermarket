@@ -83,7 +83,7 @@ func GetUserID(tokenString string) (string, error) {
 // Мидлварь для проверки JWT входящих запросов к серверу
 // позволит установить доступ к ресурсам только для авторизированных пользователей
 // Из полученного токена извлекаю ID пользователя у станавливаю этот идентификатор в контекст
-func AuthChecker(h http.Handler) http.HandlerFunc {
+func Checker(h http.Handler) http.HandlerFunc {
 	authFn := func(w http.ResponseWriter, r *http.Request) {
 		token, err := GetTokenFromCookie(r)
 		// В случае ошибки получить токен возвращаю возвращаю статус 401 - пользователь не аутентифицирован

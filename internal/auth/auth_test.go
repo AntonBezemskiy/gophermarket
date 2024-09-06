@@ -57,7 +57,7 @@ func TestAuthChecker(t *testing.T) {
 			return fn
 		}
 		r := chi.NewRouter()
-		r.Post("/api/user/orders", AuthChecker(testHandler()))
+		r.Post("/api/user/orders", Checker(testHandler()))
 
 		request := httptest.NewRequest(http.MethodPost, "/api/user/orders", nil)
 		request.AddCookie(&cookie)
@@ -76,7 +76,7 @@ func TestAuthChecker(t *testing.T) {
 			return fn
 		}
 		r := chi.NewRouter()
-		r.Post("/api/user/orders", AuthChecker(testHandler()))
+		r.Post("/api/user/orders", Checker(testHandler()))
 
 		request := httptest.NewRequest(http.MethodPost, "/api/user/orders", nil)
 		w := httptest.NewRecorder()
@@ -124,7 +124,7 @@ func TestAuthChecker(t *testing.T) {
 			return fn
 		}
 		r := chi.NewRouter()
-		r.Post("/api/user/orders", AuthChecker(testHandler()))
+		r.Post("/api/user/orders", Checker(testHandler()))
 
 		request := httptest.NewRequest(http.MethodPost, "/api/user/orders", nil)
 		request.AddCookie(&cookie)
