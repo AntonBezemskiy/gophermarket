@@ -155,7 +155,7 @@ func TestRegister(t *testing.T) {
 
 				if tt.wantStatus == 200 {
 					// проверяю токен, отправленный сервером
-					getToken, err := GetTokenFromResponseCookie(res)
+					getToken, err := auth.GetTokenFromResponseCookie(res)
 					require.NoError(t, err)
 					assert.Equal(t, tt.wantToken, getToken)
 				}
@@ -263,7 +263,7 @@ func TestAuthentication(t *testing.T) {
 
 				if tt.wantStatus == 200 {
 					// проверяю токен, отправленный сервером
-					getToken, err := GetTokenFromResponseCookie(res)
+					getToken, err := auth.GetTokenFromResponseCookie(res)
 					require.NoError(t, err)
 					assert.Equal(t, tt.wantToken, getToken)
 				}

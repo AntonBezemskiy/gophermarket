@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/AntonBezemskiy/gophermart/internal/auth"
 	"github.com/AntonBezemskiy/gophermart/internal/logger"
 	"github.com/AntonBezemskiy/gophermart/internal/repositories"
 	"go.uber.org/zap"
@@ -38,11 +39,11 @@ func Register(res http.ResponseWriter, req *http.Request, regist repositories.Au
 	}
 
 	// Для передачи аутентификационных данных использую механизм cookie
-	SetTokenCookie(res, token)
+	auth.SetTokenCookie(res, token)
 	res.WriteHeader(200)
 }
 
-func Authentication(res http.ResponseWriter, req *http.Request, auth repositories.AuthInterface) {
+func Authentication(res http.ResponseWriter, req *http.Request, authRep repositories.AuthInterface) {
 	res.Header().Set("Content-Type", "text/plain")
 	defer req.Body.Close()
 
@@ -53,7 +54,7 @@ func Authentication(res http.ResponseWriter, req *http.Request, auth repositorie
 		return
 	}
 
-	ok, token, err := auth.Authenticate(req.Context(), authData.Login, authData.Password)
+	ok, token, err := authRep.Authenticate(req.Context(), authData.Login, authData.Password)
 	if !ok {
 		logger.ServerLog.Error("authentication of user is failed", zap.String("address", req.URL.String()), zap.String("error", "login or password is wrong"))
 		http.Error(res, "login or password is wrong", http.StatusUnauthorized)
@@ -66,7 +67,7 @@ func Authentication(res http.ResponseWriter, req *http.Request, auth repositorie
 	}
 
 	// Для передачи аутентификационных данных использую механизм cookie
-	SetTokenCookie(res, token)
+	auth.SetTokenCookie(res, token)
 	res.WriteHeader(200)
 }
 
