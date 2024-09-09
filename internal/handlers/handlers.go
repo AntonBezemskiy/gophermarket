@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 
 	"github.com/AntonBezemskiy/gophermart/internal/auth"
@@ -71,6 +72,50 @@ func Authentication(res http.ResponseWriter, req *http.Request, authRep reposito
 	res.WriteHeader(200)
 }
 
+func LoadOrders(res http.ResponseWriter, req *http.Request, order repositories.OredersInterface) {
+	res.Header().Set("Content-Type", "text/plain")
+	defer req.Body.Close()
+
+	strOrderNumd, err := io.ReadAll(req.Body)
+	if err != nil {
+		logger.ServerLog.Error("can't get order number in LoadOrders", zap.String("address", req.URL.String()), zap.String("error", err.Error()))
+		http.Error(res, "can't get order number in LoadOrders", http.StatusBadRequest)
+		return
+	}
+
+	//fmt.Printf("\ntest print: %s\n", string(strOrderNumd))
+
+	code, err := order.Load(req.Context(), string(strOrderNumd))
+	if err != nil {
+		//fmt.Printf("\nerror in Load calling, err: %s\n", err.Error())
+
+		logger.ServerLog.Error("load order error", zap.String("address", req.URL.String()), zap.String("error", err.Error()))
+		http.Error(res, "load order error", http.StatusInternalServerError)
+		return
+	}
+
+	switch code {
+	case repositories.ORDERSCODE200:
+		res.WriteHeader(200)
+		return
+	case repositories.ORDERSCODE202:
+		res.WriteHeader(202)
+		return
+	case repositories.ORDERSCODE409:
+		res.WriteHeader(409)
+		return
+	case repositories.ORDERSCODE422:
+		res.WriteHeader(422)
+		return
+	default:
+		//fmt.Printf("\nundefined return code from storage, code: %d\n", code)
+
+		logger.ServerLog.Error("load order error", zap.String("address", req.URL.String()), zap.String("error", "undefined return code from storage"))
+		http.Error(res, "load order error", http.StatusInternalServerError)
+		return
+	}
+}
+
 // -----------------------------------------------------------------------------------------------------------------------------------------------
 
 func NotFoundHandler() http.HandlerFunc {
@@ -90,6 +135,13 @@ func RegisterHandler(regist repositories.AuthInterface) http.HandlerFunc {
 func AuthenticationHandler(regist repositories.AuthInterface) http.HandlerFunc {
 	fn := func(res http.ResponseWriter, req *http.Request) {
 		Authentication(res, req, regist)
+	}
+	return fn
+}
+
+func LoadOrdersHandler(order repositories.OredersInterface) http.HandlerFunc {
+	fn := func(res http.ResponseWriter, req *http.Request) {
+		LoadOrders(res, req, order)
 	}
 	return fn
 }

@@ -170,9 +170,6 @@ func TestRegister(t *testing.T) {
 func TestAuthentication(t *testing.T) {
 	// Тест с моками
 	{
-		// Тест успешной авторизации, код 200
-
-		// создаём контроллер
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
@@ -272,5 +269,76 @@ func TestAuthentication(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestLoadOrders(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	m := mocks.NewMockOredersInterface(ctrl)
+
+	// тестовый случай с кодом 200--------------------------------------------------------
+	m.EXPECT().Load(gomock.Any(), "succes order number, code 200").Return(200, nil)
+	// Создаю тело запроса номером заказа
+	orderNumb200 := []byte("succes order number, code 200")
+
+	// тестовый случай с кодом 202--------------------------------------------------------
+	m.EXPECT().Load(gomock.Any(), "succes order number, code 202").Return(202, nil)
+	// Создаю тело запроса номером заказа
+	orderNumb202 := []byte("succes order number, code 202")
+
+	// тестовый случай с кодом 409--------------------------------------------------------
+	m.EXPECT().Load(gomock.Any(), "code 409").Return(409, nil)
+	// Создаю тело запроса номером заказа
+	orderNumb409 := []byte("code 409")
+
+	// тестовый случай с кодом 409--------------------------------------------------------
+	m.EXPECT().Load(gomock.Any(), "code 500").Return(0, fmt.Errorf("load order error"))
+	// Создаю тело запроса номером заказа
+	orderNumb500 := []byte("code 500")
+
+	tests := []struct {
+		name       string
+		body       io.Reader
+		wantStatus int
+		wantError  bool
+	}{
+		{
+			name:       "code 200",
+			body:       bytes.NewReader(orderNumb200),
+			wantStatus: 200,
+		},
+		{
+			name:       "code 202",
+			body:       bytes.NewReader(orderNumb202),
+			wantStatus: 202,
+		},
+		{
+			name:       "code 409",
+			body:       bytes.NewReader(orderNumb409),
+			wantStatus: 409,
+		},
+		{
+			name:       "code 500",
+			body:       bytes.NewReader(orderNumb500),
+			wantStatus: 500,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := chi.NewRouter()
+			r.Post("/api/user/orders", LoadOrdersHandler(m))
+
+			request := httptest.NewRequest(http.MethodPost, "/api/user/orders", tt.body)
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, request)
+
+			res := w.Result()
+			defer res.Body.Close() // Закрываем тело ответа
+
+			// Проверяю код ответа
+			assert.Equal(t, tt.wantStatus, res.StatusCode)
+		})
 	}
 }
