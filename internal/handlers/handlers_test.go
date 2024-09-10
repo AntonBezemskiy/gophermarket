@@ -2,12 +2,14 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/AntonBezemskiy/gophermart/internal/auth"
 	"github.com/AntonBezemskiy/gophermart/internal/mocks"
@@ -279,34 +281,47 @@ func TestLoadOrders(t *testing.T) {
 	m := mocks.NewMockOredersInterface(ctrl)
 
 	// тестовый случай с кодом 200--------------------------------------------------------
-	m.EXPECT().Load(gomock.Any(), "succes order number, code 200").Return(200, nil)
+	m.EXPECT().Load(gomock.Any(), gomock.Any(), "succes order number, code 200").Return(200, nil)
 	// Создаю тело запроса номером заказа
 	orderNumb200 := []byte("succes order number, code 200")
 
+	// тестовый случай с кодом 200--------------------------------------------------------
+	m.EXPECT().Load(gomock.Any(), "success ID", "succes order number, code 200").Return(200, nil)
+	// Создаю тело запроса номером заказа
+	orderNumb200WithId := []byte("succes order number, code 200")
+
 	// тестовый случай с кодом 202--------------------------------------------------------
-	m.EXPECT().Load(gomock.Any(), "succes order number, code 202").Return(202, nil)
+	m.EXPECT().Load(gomock.Any(), gomock.Any(), "succes order number, code 202").Return(202, nil)
 	// Создаю тело запроса номером заказа
 	orderNumb202 := []byte("succes order number, code 202")
 
 	// тестовый случай с кодом 409--------------------------------------------------------
-	m.EXPECT().Load(gomock.Any(), "code 409").Return(409, nil)
+	m.EXPECT().Load(gomock.Any(), gomock.Any(), "code 409").Return(409, nil)
 	// Создаю тело запроса номером заказа
 	orderNumb409 := []byte("code 409")
 
 	// тестовый случай с кодом 409--------------------------------------------------------
-	m.EXPECT().Load(gomock.Any(), "code 500").Return(0, fmt.Errorf("load order error"))
+	m.EXPECT().Load(gomock.Any(), gomock.Any(), "code 500").Return(0, fmt.Errorf("load order error"))
 	// Создаю тело запроса номером заказа
 	orderNumb500 := []byte("code 500")
 
 	tests := []struct {
 		name       string
 		body       io.Reader
+		id         string
 		wantStatus int
 		wantError  bool
 	}{
 		{
 			name:       "code 200",
 			body:       bytes.NewReader(orderNumb200),
+			id:         "test id",
+			wantStatus: 200,
+		},
+		{
+			name:       "code 200 with ID",
+			body:       bytes.NewReader(orderNumb200WithId),
+			id:         "success ID",
 			wantStatus: 200,
 		},
 		{
@@ -332,13 +347,91 @@ func TestLoadOrders(t *testing.T) {
 
 			request := httptest.NewRequest(http.MethodPost, "/api/user/orders", tt.body)
 			w := httptest.NewRecorder()
-			r.ServeHTTP(w, request)
+
+			// Устанавливаю id пользователя в контекст
+			ctx := context.WithValue(request.Context(), auth.UserIDKey, tt.id)
+
+			r.ServeHTTP(w, request.WithContext(ctx))
 
 			res := w.Result()
 			defer res.Body.Close() // Закрываем тело ответа
 
 			// Проверяю код ответа
 			assert.Equal(t, tt.wantStatus, res.StatusCode)
+		})
+	}
+}
+
+func TestGetOrders(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	m := mocks.NewMockOredersInterface(ctrl)
+
+	// тестовый случай с кодом 200--------------------------------------------------------
+	loadT := time.Date(2003, time.May, 1, 17, 1, 21, 0, time.UTC)
+
+	order := repositories.Order{
+		Number:     1234,
+		Status:     "PROCESSED",
+		Accrual:    500,
+		UploadedAt: loadT,
+	}
+	orderSlice := []repositories.Order{order}
+	m.EXPECT().Get(gomock.Any(), "id of 200 code").Return(orderSlice, repositories.GETORDERSCODE200, nil)
+
+	// тестовый случай с кодом 204--------------------------------------------------------
+	m.EXPECT().Get(gomock.Any(), "id of 204 code").Return(nil, repositories.GETORDERSCODE204, nil)
+
+	tests := []struct {
+		name       string
+		id         string
+		wantStatus int
+		wantError  bool
+	}{
+		{
+			name:       "code 200",
+			id:         "id of 200 code",
+			wantStatus: 200,
+		},
+		{
+			name:       "code 204",
+			id:         "id of 204 code",
+			wantStatus: 204,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := chi.NewRouter()
+			r.Get("/api/user/orders", GetOrdersHandler(m))
+
+			request := httptest.NewRequest(http.MethodGet, "/api/user/orders", nil)
+			w := httptest.NewRecorder()
+
+			// Устанавливаю id пользователя в контекст
+			ctx := context.WithValue(request.Context(), auth.UserIDKey, tt.id)
+
+			r.ServeHTTP(w, request.WithContext(ctx))
+
+			res := w.Result()
+			defer res.Body.Close() // Закрываем тело ответа
+
+			// Проверяю код ответа
+			assert.Equal(t, tt.wantStatus, res.StatusCode)
+
+			// проверяю тело ответа в случае успешного кода запроса
+			if tt.wantStatus == 200 {
+				var resJSON = make([]repositories.Order, 0)
+				body, err := io.ReadAll(res.Body)
+				require.NoError(t, err)
+
+				buRes := bytes.NewBuffer(body)
+				dec := json.NewDecoder(buRes)
+				err = dec.Decode(&resJSON)
+				require.NoError(t, err)
+
+				assert.Equal(t, orderSlice, resJSON)
+			}
 		})
 	}
 }

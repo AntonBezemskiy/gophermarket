@@ -20,7 +20,7 @@ func SetSecretKey(newKey string) {
 
 type contextKey string
 
-const userIDKey = contextKey("userID")
+const UserIDKey = contextKey("userID")
 
 // В качестве id пользователя будет использоваться сгенерированный UUID (Universally Unique Identifier)
 // uuid.New() создает новое рандомное UUID или вызывает панику, кажется это может быть проблемой
@@ -100,7 +100,7 @@ func Checker(h http.Handler) http.HandlerFunc {
 			return
 		}
 		// В случае успешного получения id пользователя устанавливаю идентификатор в контекст Value для дальней обработки сервером
-		ctx := context.WithValue(r.Context(), userIDKey, id)
+		ctx := context.WithValue(r.Context(), UserIDKey, id)
 		// Передаю запрос дальше с изменённым контекстом
 		h.ServeHTTP(w, r.WithContext(ctx))
 	}

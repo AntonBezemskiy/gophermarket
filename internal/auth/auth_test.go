@@ -47,7 +47,7 @@ func TestAuthChecker(t *testing.T) {
 		testHandler := func() http.HandlerFunc {
 			fn := func(res http.ResponseWriter, req *http.Request) {
 				// Извлекаю ID пользователя из контекста
-				id, ok := req.Context().Value(userIDKey).(string)
+				id, ok := req.Context().Value(UserIDKey).(string)
 				require.Equal(t, true, ok)
 				// Проверяю, что ID пользователя полученный из JWT токена совпадает с ожидаемым ID
 				assert.Equal(t, userID, id)

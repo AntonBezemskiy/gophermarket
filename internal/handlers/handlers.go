@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 
@@ -73,6 +74,16 @@ func Authentication(res http.ResponseWriter, req *http.Request, authRep reposito
 }
 
 func LoadOrders(res http.ResponseWriter, req *http.Request, order repositories.OredersInterface) {
+	// Получаю id пользователя из контекста
+	id, ok := req.Context().Value(auth.UserIDKey).(string)
+	if !ok {
+		//fmt.Print("\nuser id not found\n")
+
+		logger.ServerLog.Error("user ID not found", zap.String("address", req.URL.String()))
+		http.Error(res, "user ID not found", http.StatusInternalServerError)
+		return
+	}
+
 	res.Header().Set("Content-Type", "text/plain")
 	defer req.Body.Close()
 
@@ -83,12 +94,8 @@ func LoadOrders(res http.ResponseWriter, req *http.Request, order repositories.O
 		return
 	}
 
-	//fmt.Printf("\ntest print: %s\n", string(strOrderNumd))
-
-	code, err := order.Load(req.Context(), string(strOrderNumd))
+	code, err := order.Load(req.Context(), id, string(strOrderNumd))
 	if err != nil {
-		//fmt.Printf("\nerror in Load calling, err: %s\n", err.Error())
-
 		logger.ServerLog.Error("load order error", zap.String("address", req.URL.String()), zap.String("error", err.Error()))
 		http.Error(res, "load order error", http.StatusInternalServerError)
 		return
@@ -96,22 +103,64 @@ func LoadOrders(res http.ResponseWriter, req *http.Request, order repositories.O
 
 	switch code {
 	case repositories.ORDERSCODE200:
-		res.WriteHeader(200)
+		res.WriteHeader(http.StatusOK)
 		return
 	case repositories.ORDERSCODE202:
-		res.WriteHeader(202)
+		res.WriteHeader(http.StatusAccepted)
 		return
 	case repositories.ORDERSCODE409:
-		res.WriteHeader(409)
+		res.WriteHeader(http.StatusConflict)
 		return
 	case repositories.ORDERSCODE422:
-		res.WriteHeader(422)
+		res.WriteHeader(http.StatusUnprocessableEntity)
 		return
 	default:
-		//fmt.Printf("\nundefined return code from storage, code: %d\n", code)
-
 		logger.ServerLog.Error("load order error", zap.String("address", req.URL.String()), zap.String("error", "undefined return code from storage"))
 		http.Error(res, "load order error", http.StatusInternalServerError)
+		return
+	}
+}
+
+func GetOrders(res http.ResponseWriter, req *http.Request, order repositories.OredersInterface) {
+	fmt.Print("\nIn GetOrders\n")
+
+	// Получаю id пользователя из контекста
+	id, ok := req.Context().Value(auth.UserIDKey).(string)
+	if !ok {
+		fmt.Print("\nuser id not found\n")
+
+		logger.ServerLog.Error("user ID not found", zap.String("address", req.URL.String()))
+		http.Error(res, "user ID not found", http.StatusInternalServerError)
+		return
+	}
+
+	res.Header().Set("Content-Type", "application/json")
+	defer req.Body.Close()
+
+	orders, code, err := order.Get(req.Context(), id)
+	if err != nil {
+		logger.ServerLog.Error("get orders error", zap.String("address", req.URL.String()), zap.String("error", err.Error()))
+		http.Error(res, "get orders error", http.StatusInternalServerError)
+		return
+	}
+
+	switch code {
+	case repositories.GETORDERSCODE200:
+		// устанавливаю заголовок таким образом вместо WriteHeader(http.StatusOK), потому что
+		// далее в методе Write в middleware необходимо установить заголовок Hash со значением хэша,
+		// а после WriteHeader заголовки уже не устанавливаются
+		res.Header().Set("Status-Code", "200")
+		enc := json.NewEncoder(res)
+		if err := enc.Encode(orders); err != nil {
+			logger.ServerLog.Error("error encoding response", zap.String("error", error.Error(err)))
+			return
+		}
+	case repositories.GETORDERSCODE204:
+		res.WriteHeader(http.StatusNoContent)
+		return
+	default:
+		logger.ServerLog.Error("get orders error", zap.String("address", req.URL.String()), zap.String("error", "undefined return code from storage"))
+		http.Error(res, "get orders error", http.StatusInternalServerError)
 		return
 	}
 }
@@ -142,6 +191,13 @@ func AuthenticationHandler(regist repositories.AuthInterface) http.HandlerFunc {
 func LoadOrdersHandler(order repositories.OredersInterface) http.HandlerFunc {
 	fn := func(res http.ResponseWriter, req *http.Request) {
 		LoadOrders(res, req, order)
+	}
+	return fn
+}
+
+func GetOrdersHandler(order repositories.OredersInterface) http.HandlerFunc {
+	fn := func(res http.ResponseWriter, req *http.Request) {
+		GetOrders(res, req, order)
 	}
 	return fn
 }

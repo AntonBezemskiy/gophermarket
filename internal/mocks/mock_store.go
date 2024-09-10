@@ -8,6 +8,7 @@ import (
 	context "context"
 	reflect "reflect"
 
+	repositories "github.com/AntonBezemskiy/gophermart/internal/repositories"
 	gomock "github.com/golang/mock/gomock"
 )
 
@@ -89,17 +90,33 @@ func (m *MockOredersInterface) EXPECT() *MockOredersInterfaceMockRecorder {
 	return m.recorder
 }
 
-// Load mocks base method.
-func (m *MockOredersInterface) Load(arg0 context.Context, arg1 string) (int, error) {
+// Get mocks base method.
+func (m *MockOredersInterface) Get(arg0 context.Context, arg1 string) ([]repositories.Order, int, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Load", arg0, arg1)
+	ret := m.ctrl.Call(m, "Get", arg0, arg1)
+	ret0, _ := ret[0].([]repositories.Order)
+	ret1, _ := ret[1].(int)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// Get indicates an expected call of Get.
+func (mr *MockOredersInterfaceMockRecorder) Get(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockOredersInterface)(nil).Get), arg0, arg1)
+}
+
+// Load mocks base method.
+func (m *MockOredersInterface) Load(arg0 context.Context, arg1, arg2 string) (int, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Load", arg0, arg1, arg2)
 	ret0, _ := ret[0].(int)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Load indicates an expected call of Load.
-func (mr *MockOredersInterfaceMockRecorder) Load(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockOredersInterfaceMockRecorder) Load(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Load", reflect.TypeOf((*MockOredersInterface)(nil).Load), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Load", reflect.TypeOf((*MockOredersInterface)(nil).Load), arg0, arg1, arg2)
 }
