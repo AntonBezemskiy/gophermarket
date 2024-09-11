@@ -73,7 +73,7 @@ func Authentication(res http.ResponseWriter, req *http.Request, authRep reposito
 	res.WriteHeader(200)
 }
 
-func LoadOrders(res http.ResponseWriter, req *http.Request, order repositories.OredersInterface) {
+func LoadOrders(res http.ResponseWriter, req *http.Request, order repositories.OrdersInterface) {
 	// Получаю id пользователя из контекста
 	id, ok := req.Context().Value(auth.UserIDKey).(string)
 	if !ok {
@@ -121,14 +121,10 @@ func LoadOrders(res http.ResponseWriter, req *http.Request, order repositories.O
 	}
 }
 
-func GetOrders(res http.ResponseWriter, req *http.Request, order repositories.OredersInterface) {
-	fmt.Print("\nIn GetOrders\n")
-
+func GetOrders(res http.ResponseWriter, req *http.Request, order repositories.OrdersInterface) {
 	// Получаю id пользователя из контекста
 	id, ok := req.Context().Value(auth.UserIDKey).(string)
 	if !ok {
-		fmt.Print("\nuser id not found\n")
-
 		logger.ServerLog.Error("user ID not found", zap.String("address", req.URL.String()))
 		http.Error(res, "user ID not found", http.StatusInternalServerError)
 		return
@@ -152,7 +148,7 @@ func GetOrders(res http.ResponseWriter, req *http.Request, order repositories.Or
 		res.Header().Set("Status-Code", "200")
 		enc := json.NewEncoder(res)
 		if err := enc.Encode(orders); err != nil {
-			logger.ServerLog.Error("error encoding response", zap.String("error", error.Error(err)))
+			logger.ServerLog.Error("error encoding response", zap.String("address", req.URL.String()), zap.String("error", error.Error(err)))
 			return
 		}
 	case repositories.GETORDERSCODE204:
@@ -161,6 +157,37 @@ func GetOrders(res http.ResponseWriter, req *http.Request, order repositories.Or
 	default:
 		logger.ServerLog.Error("get orders error", zap.String("address", req.URL.String()), zap.String("error", "undefined return code from storage"))
 		http.Error(res, "get orders error", http.StatusInternalServerError)
+		return
+	}
+}
+
+func GetBalance(res http.ResponseWriter, req *http.Request, blnc repositories.BalanceInterface) {
+	// Получаю id пользователя из контекста
+	id, ok := req.Context().Value(auth.UserIDKey).(string)
+	if !ok {
+		fmt.Print("\nuser id not found\n")
+
+		logger.ServerLog.Error("user ID not found", zap.String("address", req.URL.String()))
+		http.Error(res, "user ID not found", http.StatusInternalServerError)
+		return
+	}
+
+	res.Header().Set("Content-Type", "application/json")
+	defer req.Body.Close()
+
+	balance, err := blnc.Get(req.Context(), id)
+	if err != nil {
+		logger.ServerLog.Error("get balance error", zap.String("address", req.URL.String()), zap.String("error", err.Error()))
+		http.Error(res, "get balance error", http.StatusInternalServerError)
+		return
+	}
+	// устанавливаю заголовок таким образом вместо WriteHeader(http.StatusOK), потому что
+	// далее в методе Write в middleware необходимо установить заголовок Hash со значением хэша,
+	// а после WriteHeader заголовки уже не устанавливаются
+	res.Header().Set("Status-Code", "200")
+	enc := json.NewEncoder(res)
+	if err := enc.Encode(balance); err != nil {
+		logger.ServerLog.Error("error encoding response", zap.String("address", req.URL.String()), zap.String("error", error.Error(err)))
 		return
 	}
 }
@@ -188,16 +215,23 @@ func AuthenticationHandler(regist repositories.AuthInterface) http.HandlerFunc {
 	return fn
 }
 
-func LoadOrdersHandler(order repositories.OredersInterface) http.HandlerFunc {
+func LoadOrdersHandler(order repositories.OrdersInterface) http.HandlerFunc {
 	fn := func(res http.ResponseWriter, req *http.Request) {
 		LoadOrders(res, req, order)
 	}
 	return fn
 }
 
-func GetOrdersHandler(order repositories.OredersInterface) http.HandlerFunc {
+func GetOrdersHandler(order repositories.OrdersInterface) http.HandlerFunc {
 	fn := func(res http.ResponseWriter, req *http.Request) {
 		GetOrders(res, req, order)
+	}
+	return fn
+}
+
+func GetBalanceHandler(balance repositories.BalanceInterface) http.HandlerFunc {
+	fn := func(res http.ResponseWriter, req *http.Request) {
+		GetBalance(res, req, balance)
 	}
 	return fn
 }

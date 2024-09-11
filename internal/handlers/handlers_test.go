@@ -278,7 +278,7 @@ func TestLoadOrders(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	m := mocks.NewMockOredersInterface(ctrl)
+	m := mocks.NewMockOrdersInterface(ctrl)
 
 	// тестовый случай с кодом 200--------------------------------------------------------
 	m.EXPECT().Load(gomock.Any(), gomock.Any(), "succes order number, code 200").Return(200, nil)
@@ -288,7 +288,7 @@ func TestLoadOrders(t *testing.T) {
 	// тестовый случай с кодом 200--------------------------------------------------------
 	m.EXPECT().Load(gomock.Any(), "success ID", "succes order number, code 200").Return(200, nil)
 	// Создаю тело запроса номером заказа
-	orderNumb200WithId := []byte("succes order number, code 200")
+	orderNumb200WithID := []byte("succes order number, code 200")
 
 	// тестовый случай с кодом 202--------------------------------------------------------
 	m.EXPECT().Load(gomock.Any(), gomock.Any(), "succes order number, code 202").Return(202, nil)
@@ -320,7 +320,7 @@ func TestLoadOrders(t *testing.T) {
 		},
 		{
 			name:       "code 200 with ID",
-			body:       bytes.NewReader(orderNumb200WithId),
+			body:       bytes.NewReader(orderNumb200WithID),
 			id:         "success ID",
 			wantStatus: 200,
 		},
@@ -366,7 +366,7 @@ func TestGetOrders(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	m := mocks.NewMockOredersInterface(ctrl)
+	m := mocks.NewMockOrdersInterface(ctrl)
 
 	// тестовый случай с кодом 200--------------------------------------------------------
 	loadT := time.Date(2003, time.May, 1, 17, 1, 21, 0, time.UTC)
@@ -383,6 +383,9 @@ func TestGetOrders(t *testing.T) {
 	// тестовый случай с кодом 204--------------------------------------------------------
 	m.EXPECT().Get(gomock.Any(), "id of 204 code").Return(nil, repositories.GETORDERSCODE204, nil)
 
+	// тестовый случай с кодом 500--------------------------------------------------------
+	m.EXPECT().Get(gomock.Any(), "id of 500 code").Return(nil, 0, fmt.Errorf("error in get method"))
+
 	tests := []struct {
 		name       string
 		id         string
@@ -398,6 +401,11 @@ func TestGetOrders(t *testing.T) {
 			name:       "code 204",
 			id:         "id of 204 code",
 			wantStatus: 204,
+		},
+		{
+			name:       "code 500",
+			id:         "id of 500 code",
+			wantStatus: 500,
 		},
 	}
 	for _, tt := range tests {
@@ -431,6 +439,75 @@ func TestGetOrders(t *testing.T) {
 				require.NoError(t, err)
 
 				assert.Equal(t, orderSlice, resJSON)
+			}
+		})
+	}
+}
+
+func TestGetBalance(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	m := mocks.NewMockBalanceInterface(ctrl)
+
+	// тестовый случай с кодом 200--------------------------------------------------------
+	balance := repositories.Balance{
+		Current:   500,
+		Withdrawn: 20.2,
+	}
+	m.EXPECT().Get(gomock.Any(), "id of 200 code").Return(balance, nil)
+
+	// тестовый случай с кодом 500--------------------------------------------------------
+	m.EXPECT().Get(gomock.Any(), "id of 500 code").Return(repositories.Balance{}, fmt.Errorf("error in get method"))
+
+	tests := []struct {
+		name       string
+		id         string
+		wantStatus int
+		wantError  bool
+	}{
+		{
+			name:       "code 200",
+			id:         "id of 200 code",
+			wantStatus: 200,
+		},
+		{
+			name:       "code 500",
+			id:         "id of 500 code",
+			wantStatus: 500,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := chi.NewRouter()
+			r.Get("/api/user/balance", GetBalanceHandler(m))
+
+			request := httptest.NewRequest(http.MethodGet, "/api/user/balance", nil)
+			w := httptest.NewRecorder()
+
+			// Устанавливаю id пользователя в контекст
+			ctx := context.WithValue(request.Context(), auth.UserIDKey, tt.id)
+
+			r.ServeHTTP(w, request.WithContext(ctx))
+
+			res := w.Result()
+			defer res.Body.Close() // Закрываем тело ответа
+
+			// Проверяю код ответа
+			assert.Equal(t, tt.wantStatus, res.StatusCode)
+
+			// проверяю тело ответа в случае успешного кода запроса
+			if tt.wantStatus == 200 {
+				resJSON := repositories.Balance{}
+				body, err := io.ReadAll(res.Body)
+				require.NoError(t, err)
+
+				buRes := bytes.NewBuffer(body)
+				dec := json.NewDecoder(buRes)
+				err = dec.Decode(&resJSON)
+				require.NoError(t, err)
+
+				assert.Equal(t, balance, resJSON)
 			}
 		})
 	}

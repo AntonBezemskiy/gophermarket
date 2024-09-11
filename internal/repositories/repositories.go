@@ -43,7 +43,18 @@ type Order struct {
 	UploadedAt time.Time `json:"uploaded_at"` // время загрузки заказа
 }
 
-type OredersInterface interface {
+type OrdersInterface interface {
 	Load(context.Context, string, string) (int, error) // load order in storage. Gets context, id of user, order number of user. Returns different status codes and posible error
 	Get(context.Context, string) ([]Order, int, error) // get list of orders. List is sortied by data of loading. Gets context, id of user. Returns list, status and error
+}
+
+//--------------------------------------------------------------------------------------------------------------------
+
+type Balance struct {
+	Current   float64 `json:"current"`   // текущая сумма баллов лояльности
+	Withdrawn float64 `json:"withdrawn"` // сумма использованных баллов за весь период регистрации
+}
+
+type BalanceInterface interface {
+	Get(context.Context, string) (Balance, error) // For getting current balance of user. Gets context, id of user. Returns balance and error.
 }
