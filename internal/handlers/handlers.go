@@ -192,6 +192,52 @@ func GetBalance(res http.ResponseWriter, req *http.Request, blnc repositories.Ba
 	}
 }
 
+// Запрос на списание средств
+func Withdraw(res http.ResponseWriter, req *http.Request, wthdrw repositories.WithdrawInterface) {
+	// Получаю id пользователя из контекста
+	id, ok := req.Context().Value(auth.UserIDKey).(string)
+	if !ok {
+		fmt.Print("\nuser id not found\n")
+
+		logger.ServerLog.Error("user ID not found", zap.String("address", req.URL.String()))
+		http.Error(res, "user ID not found", http.StatusInternalServerError)
+		return
+	}
+
+	res.Header().Set("Content-Type", "text/plain")
+	defer req.Body.Close()
+
+	var withdraw repositories.WithdrawRequest
+	if err := json.NewDecoder(req.Body).Decode(&withdraw); err != nil {
+		logger.ServerLog.Error("decode body error", zap.String("address", req.URL.String()), zap.String("error", error.Error(err)))
+		http.Error(res, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	code, err := wthdrw.Withdraw(req.Context(), id, withdraw.Order, withdraw.Sum)
+	if err != nil {
+		logger.ServerLog.Error("request of withdraw process error", zap.String("address", req.URL.String()), zap.String("error", err.Error()))
+		http.Error(res, "request of withdraw process error", http.StatusInternalServerError)
+		return
+	}
+
+	switch code {
+	case repositories.WITHDRAWCODE200:
+		res.WriteHeader(http.StatusOK)
+		return
+	case repositories.WITHDRAWCODE402:
+		res.WriteHeader(http.StatusPaymentRequired)
+		return
+	case repositories.WITHDRAWCODE422:
+		res.WriteHeader(http.StatusUnprocessableEntity)
+		return
+	default:
+		logger.ServerLog.Error("request of withdraw process error", zap.String("address", req.URL.String()), zap.String("error", "undefined return code from storage"))
+		http.Error(res, "request of withdraw process error", http.StatusInternalServerError)
+		return
+	}
+}
+
 // -----------------------------------------------------------------------------------------------------------------------------------------------
 
 func NotFoundHandler() http.HandlerFunc {
@@ -232,6 +278,13 @@ func GetOrdersHandler(order repositories.OrdersInterface) http.HandlerFunc {
 func GetBalanceHandler(balance repositories.BalanceInterface) http.HandlerFunc {
 	fn := func(res http.ResponseWriter, req *http.Request) {
 		GetBalance(res, req, balance)
+	}
+	return fn
+}
+
+func WithdrawHandler(withdraw repositories.WithdrawInterface) http.HandlerFunc {
+	fn := func(res http.ResponseWriter, req *http.Request) {
+		Withdraw(res, req, withdraw)
 	}
 	return fn
 }

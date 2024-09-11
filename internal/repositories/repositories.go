@@ -58,3 +58,20 @@ type Balance struct {
 type BalanceInterface interface {
 	Get(context.Context, string) (Balance, error) // For getting current balance of user. Gets context, id of user. Returns balance and error.
 }
+
+//-----------------------------------------------------------------------------------------------------
+
+const (
+	WITHDRAWCODE200 = 200 // успешная обработка запроса
+	WITHDRAWCODE402 = 402 // на счету недостаточно средств
+	WITHDRAWCODE422 = 422 // неверный номер заказа
+)
+
+type WithdrawRequest struct {
+	Order string `json:"order"` // номер заказа
+	Sum   int    `json:"sum"`   // сумма баллов к списанию в счёт оплаты
+}
+
+type WithdrawInterface interface {
+	Withdraw(context.Context, string, string, int) (int, error) // request for withdrawal of funds. Gets context, id of user, order number of user, sum to withdraw. Return code and error.
+}
