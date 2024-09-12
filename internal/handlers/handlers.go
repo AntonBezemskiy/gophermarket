@@ -188,6 +188,7 @@ func GetBalance(res http.ResponseWriter, req *http.Request, blnc repositories.Ba
 	enc := json.NewEncoder(res)
 	if err := enc.Encode(balance); err != nil {
 		logger.ServerLog.Error("error encoding response", zap.String("address", req.URL.String()), zap.String("error", error.Error(err)))
+		http.Error(res, err.Error(), http.StatusInternalServerError)
 		return
 	}
 }
@@ -234,6 +235,45 @@ func Withdraw(res http.ResponseWriter, req *http.Request, wthdrw repositories.Wi
 	default:
 		logger.ServerLog.Error("request of withdraw process error", zap.String("address", req.URL.String()), zap.String("error", "undefined return code from storage"))
 		http.Error(res, "request of withdraw process error", http.StatusInternalServerError)
+		return
+	}
+}
+
+func Withdrawals(res http.ResponseWriter, req *http.Request, wthdrwls repositories.WithdrawalsInterface) {
+	// Получаю id пользователя из контекста
+	id, ok := req.Context().Value(auth.UserIDKey).(string)
+	if !ok {
+		fmt.Print("\nuser id not found\n")
+
+		logger.ServerLog.Error("user ID not found", zap.String("address", req.URL.String()))
+		http.Error(res, "user ID not found", http.StatusInternalServerError)
+		return
+	}
+
+	res.Header().Set("Content-Type", "application/json")
+	defer req.Body.Close()
+
+	withdrawals, code, err := wthdrwls.Get(req.Context(), id)
+	if err != nil {
+		logger.ServerLog.Error("get withdrawals error", zap.String("address", req.URL.String()), zap.String("error", err.Error()))
+		http.Error(res, "get withdrawals error", http.StatusInternalServerError)
+		return
+	}
+
+	switch code {
+	case repositories.WITHDRAWALS200:
+		// устанавливаю заголовок таким образом вместо WriteHeader(http.StatusOK), потому что
+		// далее в методе Write в middleware необходимо установить заголовок Hash со значением хэша,
+		// а после WriteHeader заголовки уже не устанавливаются
+		res.Header().Set("Status-Code", "200")
+		enc := json.NewEncoder(res)
+		if err := enc.Encode(withdrawals); err != nil {
+			logger.ServerLog.Error("error encoding response", zap.String("address", req.URL.String()), zap.String("error", error.Error(err)))
+			http.Error(res, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	case repositories.WITHDRAWALS204:
+		res.WriteHeader(http.StatusNoContent)
 		return
 	}
 }
@@ -285,6 +325,13 @@ func GetBalanceHandler(balance repositories.BalanceInterface) http.HandlerFunc {
 func WithdrawHandler(withdraw repositories.WithdrawInterface) http.HandlerFunc {
 	fn := func(res http.ResponseWriter, req *http.Request) {
 		Withdraw(res, req, withdraw)
+	}
+	return fn
+}
+
+func WithdrawalsHandler(wthdrwls repositories.WithdrawalsInterface) http.HandlerFunc {
+	fn := func(res http.ResponseWriter, req *http.Request) {
+		Withdrawals(res, req, wthdrwls)
 	}
 	return fn
 }

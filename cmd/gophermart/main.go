@@ -38,11 +38,11 @@ func MetricRouter() chi.Router {
 		r.Post("/orders", logger.RequestLogger(auth.Checker(handlers.LoadOrdersHandler(nil))))
 		r.Get("/orders", logger.RequestLogger(auth.Checker(handlers.GetOrdersHandler(nil))))
 
-		r.Route("/balance", func(r chi.Router){
+		r.Route("/balance", func(r chi.Router) {
 			r.Get("/", logger.RequestLogger(auth.Checker(handlers.GetBalanceHandler(nil))))
 			r.Post("/withdraw", logger.RequestLogger(auth.Checker(handlers.WithdrawHandler(nil))))
 		})
-		
+		r.Get("/withdrawals", logger.RequestLogger(auth.Checker(handlers.WithdrawalsHandler(nil))))
 	})
 
 	// Определяем маршрут по умолчанию для некорректных запросов

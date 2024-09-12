@@ -75,3 +75,19 @@ type WithdrawRequest struct {
 type WithdrawInterface interface {
 	Withdraw(context.Context, string, string, int) (int, error) // request for withdrawal of funds. Gets context, id of user, order number of user, sum to withdraw. Return code and error.
 }
+
+// -----------------------------------------------------------------------------------------------------
+const (
+	WITHDRAWALS200 = 200 // успешная обработка запроса
+	WITHDRAWALS204 = 204 // нет ни одного списания
+)
+
+type Withdrawals struct {
+	Order     string    `json:"order"`        // номер заказа
+	Sum       int       `json:"sum"`          // вывод средств
+	ProcessAt time.Time `json:"processed_at"` // дата вывода средств
+}
+
+type WithdrawalsInterface interface {
+	Get(context.Context, string) ([]Withdrawals, int, error) // get information about withdrawals. Gets context, id of user. Return list of withdrawals, status and error
+}

@@ -626,3 +626,84 @@ func TestWithdraw(t *testing.T) {
 		})
 	}
 }
+
+func TestWithdrawals(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	m := mocks.NewMockWithdrawalsInterface(ctrl)
+
+	// тестовый случай с кодом 200--------------------------------------------------------
+	loadT := time.Date(2003, time.May, 1, 17, 1, 21, 0, time.UTC)
+	withdrawals := []repositories.Withdrawals{
+		{
+			Order:     "1234",
+			Sum:       100,
+			ProcessAt: loadT,
+		},
+	}
+
+	m.EXPECT().Get(gomock.Any(), "id of 200 code").Return(withdrawals, repositories.WITHDRAWALS200, nil)
+
+	// тестовый случай с кодом 204--------------------------------------------------------
+	m.EXPECT().Get(gomock.Any(), "id of 204 code").Return(nil, repositories.WITHDRAWALS204, nil)
+
+	// тестовый случай с кодом 500--------------------------------------------------------
+	m.EXPECT().Get(gomock.Any(), "id of 500 code").Return(nil, 0, fmt.Errorf("error"))
+
+	tests := []struct {
+		name       string
+		id         string
+		wantStatus int
+	}{
+		{
+			name:       "code 200",
+			id:         "id of 200 code",
+			wantStatus: 200,
+		},
+		{
+			name:       "code 204",
+			id:         "id of 204 code",
+			wantStatus: 204,
+		},
+		{
+			name:       "code 500",
+			id:         "id of 500 code",
+			wantStatus: 500,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := chi.NewRouter()
+			r.Get("/api/user/withdrawals", WithdrawalsHandler(m))
+
+			request := httptest.NewRequest(http.MethodGet, "/api/user/withdrawals", nil)
+			w := httptest.NewRecorder()
+
+			// Устанавливаю id пользователя в контекст
+			ctx := context.WithValue(request.Context(), auth.UserIDKey, tt.id)
+
+			r.ServeHTTP(w, request.WithContext(ctx))
+
+			res := w.Result()
+			defer res.Body.Close() // Закрываем тело ответа
+
+			// Проверяю код ответа
+			assert.Equal(t, tt.wantStatus, res.StatusCode)
+
+			// проверяю тело ответа в случае успешного кода запроса
+			if tt.wantStatus == 200 {
+				resJSON := make([]repositories.Withdrawals, 0)
+				body, err := io.ReadAll(res.Body)
+				require.NoError(t, err)
+
+				buRes := bytes.NewBuffer(body)
+				dec := json.NewDecoder(buRes)
+				err = dec.Decode(&resJSON)
+				require.NoError(t, err)
+
+				assert.Equal(t, withdrawals, resJSON)
+			}
+		})
+	}
+}
