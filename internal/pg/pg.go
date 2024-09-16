@@ -77,6 +77,7 @@ func (s Store) Disable(ctx context.Context) (err error) {
 
 func (s Store) Register(ctx context.Context, login string, password string) (ok bool, token string, err error) {
 	// проверка валидности логина и пароля
+	// наверное лучше вместо ошибки возвращать статус вроде http.StatusBadRequest
 	if login == "" || password == "" {
 		err = fmt.Errorf("login or password is invalid")
 		return
@@ -124,10 +125,17 @@ func (s Store) Register(ctx context.Context, login string, password string) (ok 
 }
 
 func (s Store) Authenticate(ctx context.Context, login string, password string) (ok bool, token string, err error) {
+	// проверка валидности логина и пароля
+	// наверное лучше вместо ошибки возвращать статус вроде http.StatusBadRequest
+	if login == "" || password == "" {
+		err = fmt.Errorf("login or password is invalid")
+		return
+	}
+
 	query := `
 		SELECT
 			password,
-			token,
+			token
 		FROM auth
 		WHERE login = $1
 	`
@@ -136,13 +144,17 @@ func (s Store) Authenticate(ctx context.Context, login string, password string) 
 	var passwordFromDB string
 	err = row.Scan(&passwordFromDB, &token)
 	if err != nil {
-		return
+		if err == sql.ErrNoRows {
+			// логин уникален, пользователь не зарегистрирован. Вместо ошибки возвращаю соотвествующий статус
+			err = nil
+			ok = false
+			return
+		} else {
+			// Ошибка метода Scan
+			return
+		}
 	}
-	// если пользователь с указанным логином не найден, возвращаю сответствующий статус (ok = false)
-	if passwordFromDB == "" {
-		ok = false
-		return
-	}
+	
 	// проверяю указанный пароль на соотвествие с тем, что хранится в базе
 	if password != passwordFromDB {
 		ok = false
