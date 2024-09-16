@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,8 +12,11 @@ import (
 	"testing"
 	"time"
 
+	_ "github.com/jackc/pgx/v5/stdlib"
+
 	"github.com/AntonBezemskiy/gophermart/internal/auth"
 	"github.com/AntonBezemskiy/gophermart/internal/mocks"
+	"github.com/AntonBezemskiy/gophermart/internal/pg"
 	"github.com/AntonBezemskiy/gophermart/internal/repositories"
 	"github.com/go-chi/chi/v5"
 	"github.com/golang/mock/gomock"
@@ -64,8 +68,6 @@ func TestNotFound(t *testing.T) {
 func TestRegister(t *testing.T) {
 	// Тест с моками
 	{
-		// Тест успешной авторизации, код 200
-
 		// создаём контроллер
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
@@ -166,6 +168,118 @@ func TestRegister(t *testing.T) {
 				}
 			})
 		}
+	}
+	// тесты с базой данных
+	// предварительно необходимо создать тестовую БД и определить параметры сединения host=host user=user password=password dbname=dbname  sslmode=disable
+	{
+		// инициализация базы данных-------------------------------------------------------------------
+		databaseDsn := "host=localhost user=testgophermart password=newpassword dbname=testgophermart sslmode=disable"
+
+		// создаём соединение с СУБД PostgreSQL
+		conn, err := sql.Open("pgx", databaseDsn)
+		require.NoError(t, err)
+		defer conn.Close()
+
+		// Проверка соединения с БД
+		ctx := context.Background()
+		err = conn.PingContext(ctx)
+		require.NoError(t, err)
+
+		// создаем экземпляр хранилища pg
+		stor := pg.NewStore(conn)
+		err = stor.Bootstrap(ctx)
+		require.NoError(t, err)
+		//------------------------------------------------------------------------------------------------------
+
+		// тестовый случай с кодом 200---------------------------------------------------------
+		// Создаю тело запроса с логином и паролем пользователя
+		authData := *repositories.NewAuthData("successLogin", "successPassword")
+		// сериализую струтктуру с логином и паролем в json-представление в виде слайса байт
+		var bufEncode200 bytes.Buffer
+		enc := json.NewEncoder(&bufEncode200)
+		err = enc.Encode(authData)
+		require.NoError(t, err)
+
+		// тестовый случай с кодом 409-------------------------------------------------------------------
+		// Создаю тело запроса с логином и паролем пользователя
+		authData = *repositories.NewAuthData("successLogin", "successPassword")
+		// сериализую струтктуру с логином и паролем в json-представление в виде testFuncслайса байт
+		var bufEncode409 bytes.Buffer
+		enc = json.NewEncoder(&bufEncode409)
+		err = enc.Encode(authData)
+		require.NoError(t, err)
+
+		// тестовый случай с кодом 500-------------------------------------------------------------------
+		// Создаю тело запроса с логином и паролем пользователя
+		authData = *repositories.NewAuthData("", "password")
+		// сериализую струтктуру с логином и паролем в json-представление в виде слайса байт
+		var bufEncode500 bytes.Buffer
+		enc = json.NewEncoder(&bufEncode500)
+		err = enc.Encode(authData)
+		require.NoError(t, err)
+
+		tests := []struct {
+			name       string
+			login      string
+			password   string
+			body       io.Reader
+			wantStatus int
+			wantError  bool
+		}{
+			{
+				name:       "succes register, status 200",
+				body:       &bufEncode200,
+				wantStatus: 200,
+				wantError:  false,
+			},
+			{
+				name:       "wrong format of request, status 400",
+				body:       nil,
+				wantStatus: 400,
+				wantError:  true,
+			},
+			{
+				name:       "login already is used, status 409",
+				body:       &bufEncode409,
+				wantStatus: 409,
+				wantError:  true,
+			},
+			{
+				name:       "internal server error, status 500",
+				body:       &bufEncode500,
+				wantStatus: 500,
+				wantError:  true,
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				r := chi.NewRouter()
+				r.Post("/api/user/register", RegisterHandler(stor))
+
+				request := httptest.NewRequest(http.MethodPost, "/api/user/register", tt.body)
+				w := httptest.NewRecorder()
+				r.ServeHTTP(w, request)
+
+				res := w.Result()
+				defer res.Body.Close() // Закрываем тело ответа
+
+				// Проверяю код ответа
+				assert.Equal(t, tt.wantStatus, res.StatusCode)
+
+				if tt.wantStatus == 200 {
+					// проверяю токен, отправленный сервером
+					getToken, err := auth.GetTokenFromResponseCookie(res)
+					require.NoError(t, err)
+					assert.NotEqual(t, "", getToken)
+				}
+				if tt.wantError {
+					assert.NotEqual(t, 200, res.StatusCode)
+				}
+			})
+		}
+		// Удаление тестовых таблиц для выполнения следующих тестов
+		err = stor.Disable(ctx)
+		require.NoError(t, err)
 	}
 }
 

@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 
@@ -17,6 +16,7 @@ func NotFound(res http.ResponseWriter, req *http.Request) {
 	res.WriteHeader(http.StatusNotFound)
 }
 
+// Регистрация пользователя
 func Register(res http.ResponseWriter, req *http.Request, regist repositories.AuthInterface) {
 	res.Header().Set("Content-Type", "text/plain")
 	defer req.Body.Close()
@@ -29,14 +29,14 @@ func Register(res http.ResponseWriter, req *http.Request, regist repositories.Au
 	}
 
 	ok, token, err := regist.Register(req.Context(), authData.Login, authData.Password)
-	if !ok {
-		logger.ServerLog.Error("register of new user is failed", zap.String("address", req.URL.String()), zap.String("error", "login is not unique"))
-		http.Error(res, "login is not unique", http.StatusConflict)
-		return
-	}
 	if err != nil {
 		logger.ServerLog.Error("register new user error", zap.String("address", req.URL.String()), zap.String("error: ", error.Error(err)))
 		http.Error(res, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if !ok {
+		logger.ServerLog.Error("register of new user is failed", zap.String("address", req.URL.String()), zap.String("error", "login is not unique"))
+		http.Error(res, "login is not unique", http.StatusConflict)
 		return
 	}
 
@@ -45,6 +45,7 @@ func Register(res http.ResponseWriter, req *http.Request, regist repositories.Au
 	res.WriteHeader(200)
 }
 
+// Аутентификация пользователя
 func Authentication(res http.ResponseWriter, req *http.Request, authRep repositories.AuthInterface) {
 	res.Header().Set("Content-Type", "text/plain")
 	defer req.Body.Close()
@@ -57,14 +58,14 @@ func Authentication(res http.ResponseWriter, req *http.Request, authRep reposito
 	}
 
 	ok, token, err := authRep.Authenticate(req.Context(), authData.Login, authData.Password)
-	if !ok {
-		logger.ServerLog.Error("authentication of user is failed", zap.String("address", req.URL.String()), zap.String("error", "login or password is wrong"))
-		http.Error(res, "login or password is wrong", http.StatusUnauthorized)
-		return
-	}
 	if err != nil {
 		logger.ServerLog.Error("authentication of user error", zap.String("address", req.URL.String()), zap.String("error: ", error.Error(err)))
 		http.Error(res, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if !ok {
+		logger.ServerLog.Error("authentication of user is failed", zap.String("address", req.URL.String()), zap.String("error", "login or password is wrong"))
+		http.Error(res, "login or password is wrong", http.StatusUnauthorized)
 		return
 	}
 
@@ -73,12 +74,11 @@ func Authentication(res http.ResponseWriter, req *http.Request, authRep reposito
 	res.WriteHeader(200)
 }
 
+// Загрузка заказа в сервис
 func LoadOrders(res http.ResponseWriter, req *http.Request, order repositories.OrdersInterface) {
 	// Получаю id пользователя из контекста
 	id, ok := req.Context().Value(auth.UserIDKey).(string)
 	if !ok {
-		//fmt.Print("\nuser id not found\n")
-
 		logger.ServerLog.Error("user ID not found", zap.String("address", req.URL.String()))
 		http.Error(res, "user ID not found", http.StatusInternalServerError)
 		return
@@ -121,6 +121,7 @@ func LoadOrders(res http.ResponseWriter, req *http.Request, order repositories.O
 	}
 }
 
+// Выгрузка списка заказов пользователя отсортированных по времени загрузки
 func GetOrders(res http.ResponseWriter, req *http.Request, order repositories.OrdersInterface) {
 	// Получаю id пользователя из контекста
 	id, ok := req.Context().Value(auth.UserIDKey).(string)
@@ -161,12 +162,11 @@ func GetOrders(res http.ResponseWriter, req *http.Request, order repositories.Or
 	}
 }
 
+// Получение баланса пользователя
 func GetBalance(res http.ResponseWriter, req *http.Request, blnc repositories.BalanceInterface) {
 	// Получаю id пользователя из контекста
 	id, ok := req.Context().Value(auth.UserIDKey).(string)
 	if !ok {
-		fmt.Print("\nuser id not found\n")
-
 		logger.ServerLog.Error("user ID not found", zap.String("address", req.URL.String()))
 		http.Error(res, "user ID not found", http.StatusInternalServerError)
 		return
@@ -198,8 +198,6 @@ func Withdraw(res http.ResponseWriter, req *http.Request, wthdrw repositories.Wi
 	// Получаю id пользователя из контекста
 	id, ok := req.Context().Value(auth.UserIDKey).(string)
 	if !ok {
-		fmt.Print("\nuser id not found\n")
-
 		logger.ServerLog.Error("user ID not found", zap.String("address", req.URL.String()))
 		http.Error(res, "user ID not found", http.StatusInternalServerError)
 		return
@@ -243,8 +241,6 @@ func Withdrawals(res http.ResponseWriter, req *http.Request, wthdrwls repositori
 	// Получаю id пользователя из контекста
 	id, ok := req.Context().Value(auth.UserIDKey).(string)
 	if !ok {
-		fmt.Print("\nuser id not found\n")
-
 		logger.ServerLog.Error("user ID not found", zap.String("address", req.URL.String()))
 		http.Error(res, "user ID not found", http.StatusInternalServerError)
 		return

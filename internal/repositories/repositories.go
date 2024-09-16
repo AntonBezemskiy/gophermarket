@@ -6,8 +6,8 @@ import (
 )
 
 type AuthInterface interface {
-	Register(context.Context, string, string) (bool, string, error)     // return values is Ok, token and error. Ok is false when login of user is not unique
-	Authenticate(context.Context, string, string) (bool, string, error) // return values is Ok, token and error. Ok is false when login or password of user is wrong
+	Register(ctx context.Context, login string, password string) (ok bool, token string, err error)     // return values is Ok, token and error. Ok is false when login of user is not unique
+	Authenticate(ctx context.Context, login string, password string) (ok bool, token string, err error) // return values is Ok, token and error. Ok is false when login or password of user is wrong
 }
 
 type AuthData struct {
@@ -44,8 +44,8 @@ type Order struct {
 }
 
 type OrdersInterface interface {
-	Load(context.Context, string, string) (int, error) // load order in storage. Gets context, id of user, order number of user. Returns different status codes and posible error
-	Get(context.Context, string) ([]Order, int, error) // get list of orders. List is sortied by data of loading. Gets context, id of user. Returns list, status and error
+	Load(ctx context.Context, idUser string, orderNumber string) (status int, err error) // load order in storage. Gets context, id of user, order number of user. Returns different status codes and posible error
+	Get(ctx context.Context, idUser string) (orders []Order, status int, err error)      // get list of orders. List is sortied by data of loading. Gets context, id of user. Returns list, status and error
 }
 
 //--------------------------------------------------------------------------------------------------------------------
@@ -56,7 +56,7 @@ type Balance struct {
 }
 
 type BalanceInterface interface {
-	Get(context.Context, string) (Balance, error) // For getting current balance of user. Gets context, id of user. Returns balance and error.
+	Get(ctx context.Context, idUser string) (balance Balance, err error) // For getting current balance of user. Gets context, id of user. Returns balance and error.
 }
 
 //-----------------------------------------------------------------------------------------------------
@@ -73,7 +73,7 @@ type WithdrawRequest struct {
 }
 
 type WithdrawInterface interface {
-	Withdraw(context.Context, string, string, int) (int, error) // request for withdrawal of funds. Gets context, id of user, order number of user, sum to withdraw. Return code and error.
+	Withdraw(ctx context.Context, idUser string, orderNumber string, sum int) (status int, err error) // request for withdrawal of funds. Gets context, id of user, order number of user, sum to withdraw. Return code and error.
 }
 
 // -----------------------------------------------------------------------------------------------------
@@ -89,5 +89,5 @@ type Withdrawals struct {
 }
 
 type WithdrawalsInterface interface {
-	Get(context.Context, string) ([]Withdrawals, int, error) // get information about withdrawals. Gets context, id of user. Return list of withdrawals, status and error
+	Get(ctx context.Context, idUser string) (withdrawals []Withdrawals, status int, err error) // get information about withdrawals. Gets context, id of user. Return list of withdrawals, status and error
 }
