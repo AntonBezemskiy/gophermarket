@@ -719,61 +719,120 @@ func TestLoadOrders(t *testing.T) {
 }
 
 func TestGetOrders(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	// Тест с моками
+	{
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
 
-	m := mocks.NewMockOrdersInterface(ctrl)
+		m := mocks.NewMockOrdersInterface(ctrl)
 
-	// тестовый случай с кодом 200--------------------------------------------------------
-	loadT := time.Date(2003, time.May, 1, 17, 1, 21, 0, time.UTC)
+		// тестовый случай с кодом 200--------------------------------------------------------
+		loadT := time.Date(2003, time.May, 1, 17, 1, 21, 0, time.UTC)
 
-	order := repositories.Order{
-		Number:     1234,
-		Status:     "PROCESSED",
-		Accrual:    500,
-		UploadedAt: loadT,
+		order := repositories.Order{
+			Number:     1234,
+			Status:     "PROCESSED",
+			Accrual:    500,
+			UploadedAt: loadT,
+		}
+		orderSlice := []repositories.Order{order}
+		m.EXPECT().Get(gomock.Any(), "id of 200 code").Return(orderSlice, repositories.GETORDERSCODE200, nil)
+
+		// тестовый случай с кодом 204--------------------------------------------------------
+		m.EXPECT().Get(gomock.Any(), "id of 204 code").Return(nil, repositories.GETORDERSCODE204, nil)
+
+		// тестовый случай с кодом 500--------------------------------------------------------
+		m.EXPECT().Get(gomock.Any(), "id of 500 code").Return(nil, 0, fmt.Errorf("error in get method"))
+
+		tests := []struct {
+			name       string
+			id         string
+			wantStatus int
+			wantError  bool
+		}{
+			{
+				name:       "code 200",
+				id:         "id of 200 code",
+				wantStatus: 200,
+			},
+			{
+				name:       "code 204",
+				id:         "id of 204 code",
+				wantStatus: 204,
+			},
+			{
+				name:       "code 500",
+				id:         "id of 500 code",
+				wantStatus: 500,
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				r := chi.NewRouter()
+				r.Get("/api/user/orders", GetOrdersHandler(m))
+
+				request := httptest.NewRequest(http.MethodGet, "/api/user/orders", nil)
+				w := httptest.NewRecorder()
+
+				// Устанавливаю id пользователя в контекст
+				ctx := context.WithValue(request.Context(), auth.UserIDKey, tt.id)
+
+				r.ServeHTTP(w, request.WithContext(ctx))
+
+				res := w.Result()
+				defer res.Body.Close() // Закрываем тело ответа
+
+				// Проверяю код ответа
+				assert.Equal(t, tt.wantStatus, res.StatusCode)
+
+				// проверяю тело ответа в случае успешного кода запроса
+				if tt.wantStatus == 200 {
+					var resJSON = make([]repositories.Order, 0)
+					body, err := io.ReadAll(res.Body)
+					require.NoError(t, err)
+
+					buRes := bytes.NewBuffer(body)
+					dec := json.NewDecoder(buRes)
+					err = dec.Decode(&resJSON)
+					require.NoError(t, err)
+
+					assert.Equal(t, orderSlice, resJSON)
+				}
+			})
+		}
 	}
-	orderSlice := []repositories.Order{order}
-	m.EXPECT().Get(gomock.Any(), "id of 200 code").Return(orderSlice, repositories.GETORDERSCODE200, nil)
+	// тесты с базой данных
+	// предварительно необходимо создать тестовую БД и определить параметры сединения host=host user=user password=password dbname=dbname  sslmode=disable
+	{
+		// инициализация базы данных-------------------------------------------------------------------
+		databaseDsn := "host=localhost user=testgophermart password=newpassword dbname=testgophermart sslmode=disable"
 
-	// тестовый случай с кодом 204--------------------------------------------------------
-	m.EXPECT().Get(gomock.Any(), "id of 204 code").Return(nil, repositories.GETORDERSCODE204, nil)
+		// создаём соединение с СУБД PostgreSQL
+		conn, err := sql.Open("pgx", databaseDsn)
+		require.NoError(t, err)
+		defer conn.Close()
 
-	// тестовый случай с кодом 500--------------------------------------------------------
-	m.EXPECT().Get(gomock.Any(), "id of 500 code").Return(nil, 0, fmt.Errorf("error in get method"))
+		// Проверка соединения с БД
+		ctx := context.Background()
+		err = conn.PingContext(ctx)
+		require.NoError(t, err)
 
-	tests := []struct {
-		name       string
-		id         string
-		wantStatus int
-		wantError  bool
-	}{
+		// создаем экземпляр хранилища pg
+		stor := pg.NewStore(conn)
+		err = stor.Bootstrap(ctx)
+		require.NoError(t, err)
+		//-------------------------------------------------------------------------------------------------------------
+
+		// проверка статуса 204. У пользователя нет заказов
 		{
-			name:       "code 200",
-			id:         "id of 200 code",
-			wantStatus: 200,
-		},
-		{
-			name:       "code 204",
-			id:         "id of 204 code",
-			wantStatus: 204,
-		},
-		{
-			name:       "code 500",
-			id:         "id of 500 code",
-			wantStatus: 500,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
 			r := chi.NewRouter()
-			r.Get("/api/user/orders", GetOrdersHandler(m))
+			r.Get("/api/user/orders", GetOrdersHandler(stor))
 
 			request := httptest.NewRequest(http.MethodGet, "/api/user/orders", nil)
 			w := httptest.NewRecorder()
 
 			// Устанавливаю id пользователя в контекст
-			ctx := context.WithValue(request.Context(), auth.UserIDKey, tt.id)
+			ctx := context.WithValue(request.Context(), auth.UserIDKey, "user id 204")
 
 			r.ServeHTTP(w, request.WithContext(ctx))
 
@@ -781,22 +840,88 @@ func TestGetOrders(t *testing.T) {
 			defer res.Body.Close() // Закрываем тело ответа
 
 			// Проверяю код ответа
-			assert.Equal(t, tt.wantStatus, res.StatusCode)
+			assert.Equal(t, 204, res.StatusCode)
+		}
 
-			// проверяю тело ответа в случае успешного кода запроса
-			if tt.wantStatus == 200 {
-				var resJSON = make([]repositories.Order, 0)
-				body, err := io.ReadAll(res.Body)
-				require.NoError(t, err)
-
-				buRes := bytes.NewBuffer(body)
-				dec := json.NewDecoder(buRes)
-				err = dec.Decode(&resJSON)
-				require.NoError(t, err)
-
-				assert.Equal(t, orderSlice, resJSON)
+		// проверка статуса 200
+		{
+			// предварительно загружаю в базу заказы-------------------------
+			order1 := repositories.Order{
+				Number: 562246784655,
+				Status: repositories.NEW,
 			}
-		})
+			status, err := stor.Load(ctx, "user id 200", "562246784655")
+			require.NoError(t, err)
+			assert.Equal(t, 202, status)
+			// устанавливаю паузу, чтобы заказы имели разное время загрузки
+			time.Sleep(100 * time.Millisecond)
+
+			order2 := repositories.Order{
+				Number: 657064403758,
+				Status: repositories.NEW,
+			}
+			status, err = stor.Load(ctx, "user id 200", "657064403758")
+			require.NoError(t, err)
+			assert.Equal(t, 202, status)
+			time.Sleep(100 * time.Millisecond)
+
+			order3 := repositories.Order{
+				Number: 767611725239,
+				Status: repositories.NEW,
+			}
+			status, err = stor.Load(ctx, "user id 200", "767611725239")
+			require.NoError(t, err)
+			assert.Equal(t, 202, status)
+			time.Sleep(100 * time.Millisecond)
+
+			// выполняю запрос к серверу-------------------------------------------
+			r := chi.NewRouter()
+			r.Get("/api/user/orders", GetOrdersHandler(stor))
+
+			request := httptest.NewRequest(http.MethodGet, "/api/user/orders", nil)
+			w := httptest.NewRecorder()
+
+			// Устанавливаю id пользователя в контекст
+			ctx := context.WithValue(request.Context(), auth.UserIDKey, "user id 200")
+
+			r.ServeHTTP(w, request.WithContext(ctx))
+
+			res := w.Result()
+			defer res.Body.Close() // Закрываем тело ответа
+
+			// Проверяю код ответа
+			assert.Equal(t, 200, res.StatusCode)
+
+			// проверяю тело ответа, заказы должны быть отсортированы по времени загрузки и содержать корректные поля
+			var resJSON = make([]repositories.Order, 0)
+			body, err := io.ReadAll(res.Body)
+			require.NoError(t, err)
+
+			buRes := bytes.NewBuffer(body)
+			dec := json.NewDecoder(buRes)
+			err = dec.Decode(&resJSON)
+			require.NoError(t, err)
+
+			assert.Equal(t, 3, len(resJSON))
+			for n, order := range resJSON {
+				if n == 0 {
+					assert.Equal(t, order3.Number, order.Number)
+					assert.Equal(t, order3.Status, order.Status)
+				}
+				if n == 1 {
+					assert.Equal(t, order2.Number, order.Number)
+					assert.Equal(t, order2.Status, order.Status)
+				}
+				if n == 2 {
+					assert.Equal(t, order1.Number, order.Number)
+					assert.Equal(t, order1.Status, order.Status)
+				}
+			}
+		}
+
+		// Удаление данных из тестовых таблиц для выполнения следующих тестов------------------------------------------
+		//err = stor.Disable(ctx)
+		//require.NoError(t, err)
 	}
 }
 

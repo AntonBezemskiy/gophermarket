@@ -252,5 +252,59 @@ func (s Store) Load(ctx context.Context, idUser string, orderNumber string) (sta
 }
 
 func (s Store) Get(ctx context.Context, idUser string) (orders []repositories.Order, status int, err error) {
+	orders = make([]repositories.Order, 0)
+
+	// выгружаю все заказы, которые соответствуют данному польззователя. Сортировка по времени от самых новых к самым старым заказам
+	query := `
+		SELECT
+			number,
+			status,
+			accrual,
+			uploaded_at
+		FROM orders
+		WHERE id_user = $1
+		ORDER BY uploaded_at DESC
+	`
+	// получаю заказы, которые данный пользователь загрузил в систему
+	rows, errQuery := s.conn.QueryContext(ctx, query, idUser)
+	if errQuery != nil {
+		err = errQuery
+		return
+	}
+	// обязательно закрываем перед возвратом функции
+	defer rows.Close()
+
+	// // проверяем, есть ли у данного пользователя заказы
+	// if !rows.Next() {
+	// 	// пользователя не загрузил ни одного заказа, возвращаю статус 204
+	// 	status = repositories.GETORDERSCODE204
+	// 	return
+	// }
+
+	ordersExist := false
+	// собираю заказы для ответа сервера
+	for rows.Next() {
+		// флаг, что пользователь загрузил как минимум один заказ
+		ordersExist = true
+
+		var order repositories.Order
+		err = rows.Scan(&order.Number, &order.Status, &order.Accrual, &order.UploadedAt)
+		if err != nil {
+			return
+		}
+		orders = append(orders, order)
+	}
+	// проверяю, есть ли у данного пользователя заказы
+	if !ordersExist {
+		//пользователя не загрузил ни одного заказа, возвращаю статус 204
+		status = repositories.GETORDERSCODE204
+		return
+	}
+	// проверяю на ошибки
+	err = rows.Err()
+	if err != nil {
+		return
+	}
+	status = repositories.GETORDERSCODE200
 	return
 }
