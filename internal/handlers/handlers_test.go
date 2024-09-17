@@ -24,6 +24,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+//Для генерации моков необходимо использовать такую команду:
+// mockgen -destination=internal/mocks/mock_store.go &&
+// -package=mocks github.com/AntonBezemskiy/gophermart/internal/repositories AuthInterface,OrdersInterface,BalanceInterface,WithdrawInterface,WithdrawalsInterface
+
 func TestNotFound(t *testing.T) {
 	type want struct {
 		code        int
@@ -736,13 +740,13 @@ func TestGetOrders(t *testing.T) {
 			UploadedAt: loadT,
 		}
 		orderSlice := []repositories.Order{order}
-		m.EXPECT().Get(gomock.Any(), "id of 200 code").Return(orderSlice, repositories.GETORDERSCODE200, nil)
+		m.EXPECT().GetOrders(gomock.Any(), "id of 200 code").Return(orderSlice, repositories.GETORDERSCODE200, nil)
 
 		// тестовый случай с кодом 204--------------------------------------------------------
-		m.EXPECT().Get(gomock.Any(), "id of 204 code").Return(nil, repositories.GETORDERSCODE204, nil)
+		m.EXPECT().GetOrders(gomock.Any(), "id of 204 code").Return(nil, repositories.GETORDERSCODE204, nil)
 
 		// тестовый случай с кодом 500--------------------------------------------------------
-		m.EXPECT().Get(gomock.Any(), "id of 500 code").Return(nil, 0, fmt.Errorf("error in get method"))
+		m.EXPECT().GetOrders(gomock.Any(), "id of 500 code").Return(nil, 0, fmt.Errorf("error in get method"))
 
 		tests := []struct {
 			name       string
@@ -920,54 +924,121 @@ func TestGetOrders(t *testing.T) {
 		}
 
 		// Удаление данных из тестовых таблиц для выполнения следующих тестов------------------------------------------
-		//err = stor.Disable(ctx)
-		//require.NoError(t, err)
+		err = stor.Disable(ctx)
+		require.NoError(t, err)
 	}
 }
 
 func TestGetBalance(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	{
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
 
-	m := mocks.NewMockBalanceInterface(ctrl)
+		m := mocks.NewMockBalanceInterface(ctrl)
 
-	// тестовый случай с кодом 200--------------------------------------------------------
-	balance := repositories.Balance{
-		Current:   500,
-		Withdrawn: 20.2,
+		// тестовый случай с кодом 200--------------------------------------------------------
+		balance := repositories.Balance{
+			Current:   500,
+			Withdrawn: 20.2,
+		}
+		m.EXPECT().GetBalance(gomock.Any(), "id of 200 code").Return(balance, nil)
+
+		// тестовый случай с кодом 500--------------------------------------------------------
+		m.EXPECT().GetBalance(gomock.Any(), "id of 500 code").Return(repositories.Balance{}, fmt.Errorf("error in get method"))
+
+		tests := []struct {
+			name       string
+			id         string
+			wantStatus int
+			wantError  bool
+		}{
+			{
+				name:       "code 200",
+				id:         "id of 200 code",
+				wantStatus: 200,
+			},
+			{
+				name:       "code 500",
+				id:         "id of 500 code",
+				wantStatus: 500,
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				r := chi.NewRouter()
+				r.Get("/api/user/balance", GetBalanceHandler(m))
+
+				request := httptest.NewRequest(http.MethodGet, "/api/user/balance", nil)
+				w := httptest.NewRecorder()
+
+				// Устанавливаю id пользователя в контекст
+				ctx := context.WithValue(request.Context(), auth.UserIDKey, tt.id)
+
+				r.ServeHTTP(w, request.WithContext(ctx))
+
+				res := w.Result()
+				defer res.Body.Close() // Закрываем тело ответа
+
+				// Проверяю код ответа
+				assert.Equal(t, tt.wantStatus, res.StatusCode)
+
+				// проверяю тело ответа в случае успешного кода запроса
+				if tt.wantStatus == 200 {
+					resJSON := repositories.Balance{}
+					body, err := io.ReadAll(res.Body)
+					require.NoError(t, err)
+
+					buRes := bytes.NewBuffer(body)
+					dec := json.NewDecoder(buRes)
+					err = dec.Decode(&resJSON)
+					require.NoError(t, err)
+
+					assert.Equal(t, balance, resJSON)
+				}
+			})
+		}
 	}
-	m.EXPECT().Get(gomock.Any(), "id of 200 code").Return(balance, nil)
+	// тесты с базой данных
+	// предварительно необходимо создать тестовую БД и определить параметры сединения host=host user=user password=password dbname=dbname  sslmode=disable
+	{
+		// инициализация базы данных-------------------------------------------------------------------
+		databaseDsn := "host=localhost user=testgophermart password=newpassword dbname=testgophermart sslmode=disable"
 
-	// тестовый случай с кодом 500--------------------------------------------------------
-	m.EXPECT().Get(gomock.Any(), "id of 500 code").Return(repositories.Balance{}, fmt.Errorf("error in get method"))
+		// создаём соединение с СУБД PostgreSQL
+		conn, err := sql.Open("pgx", databaseDsn)
+		require.NoError(t, err)
+		defer conn.Close()
 
-	tests := []struct {
-		name       string
-		id         string
-		wantStatus int
-		wantError  bool
-	}{
+		// Проверка соединения с БД
+		ctx := context.Background()
+		err = conn.PingContext(ctx)
+		require.NoError(t, err)
+
+		// создаем экземпляр хранилища pg
+		stor := pg.NewStore(conn)
+		err = stor.Bootstrap(ctx)
+		require.NoError(t, err)
+		//-------------------------------------------------------------------------------------------------------------
+
+		// тестовый случай с кодом 200 без задействования системы accrual
 		{
-			name:       "code 200",
-			id:         "id of 200 code",
-			wantStatus: 200,
-		},
-		{
-			name:       "code 500",
-			id:         "id of 500 code",
-			wantStatus: 500,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+			// Регистрирую нового пользователя
+			ok, token, err := stor.Register(ctx, "login", "password")
+			require.NoError(t, err)
+			assert.Equal(t, true, ok)
+			// получаю id пользователя из токена
+			id, err := auth.GetUserID(token)
+			require.NoError(t, err)
+
+			// создаю тестовый сервер---------------------------------------
 			r := chi.NewRouter()
-			r.Get("/api/user/balance", GetBalanceHandler(m))
+			r.Get("/api/user/balance", GetBalanceHandler(stor))
 
 			request := httptest.NewRequest(http.MethodGet, "/api/user/balance", nil)
 			w := httptest.NewRecorder()
 
 			// Устанавливаю id пользователя в контекст
-			ctx := context.WithValue(request.Context(), auth.UserIDKey, tt.id)
+			ctx := context.WithValue(request.Context(), auth.UserIDKey, id)
 
 			r.ServeHTTP(w, request.WithContext(ctx))
 
@@ -975,22 +1046,45 @@ func TestGetBalance(t *testing.T) {
 			defer res.Body.Close() // Закрываем тело ответа
 
 			// Проверяю код ответа
-			assert.Equal(t, tt.wantStatus, res.StatusCode)
+			assert.Equal(t, 200, res.StatusCode)
 
-			// проверяю тело ответа в случае успешного кода запроса
-			if tt.wantStatus == 200 {
-				resJSON := repositories.Balance{}
-				body, err := io.ReadAll(res.Body)
-				require.NoError(t, err)
+			resJSON := repositories.Balance{}
+			body, err := io.ReadAll(res.Body)
+			require.NoError(t, err)
 
-				buRes := bytes.NewBuffer(body)
-				dec := json.NewDecoder(buRes)
-				err = dec.Decode(&resJSON)
-				require.NoError(t, err)
+			buRes := bytes.NewBuffer(body)
+			dec := json.NewDecoder(buRes)
+			err = dec.Decode(&resJSON)
+			require.NoError(t, err)
 
-				assert.Equal(t, balance, resJSON)
-			}
-		})
+			assert.Equal(t, 0.0, resJSON.Current)
+			assert.Equal(t, 0.0, resJSON.Withdrawn)
+		}
+
+		// тестовый случай с кодом 500
+		{
+			// создаю тестовый сервер---------------------------------------
+			r := chi.NewRouter()
+			r.Get("/api/user/balance", GetBalanceHandler(stor))
+
+			request := httptest.NewRequest(http.MethodGet, "/api/user/balance", nil)
+			w := httptest.NewRecorder()
+
+			// Устанавливаю незарегистрированный id пользователя в контекст, что приведет к ошибке
+			ctx := context.WithValue(request.Context(), auth.UserIDKey, "not exist id")
+
+			r.ServeHTTP(w, request.WithContext(ctx))
+
+			res := w.Result()
+			defer res.Body.Close() // Закрываем тело ответа
+
+			// Проверяю код ответа
+			assert.Equal(t, 500, res.StatusCode)
+		}
+
+		// Удаление данных из тестовых таблиц для выполнения следующих тестов------------------------------------------
+		err = stor.Disable(ctx)
+		require.NoError(t, err)
 	}
 }
 
@@ -1124,13 +1218,13 @@ func TestWithdrawals(t *testing.T) {
 		},
 	}
 
-	m.EXPECT().Get(gomock.Any(), "id of 200 code").Return(withdrawals, repositories.WITHDRAWALS200, nil)
+	m.EXPECT().GetWithdrawals(gomock.Any(), "id of 200 code").Return(withdrawals, repositories.WITHDRAWALS200, nil)
 
 	// тестовый случай с кодом 204--------------------------------------------------------
-	m.EXPECT().Get(gomock.Any(), "id of 204 code").Return(nil, repositories.WITHDRAWALS204, nil)
+	m.EXPECT().GetWithdrawals(gomock.Any(), "id of 204 code").Return(nil, repositories.WITHDRAWALS204, nil)
 
 	// тестовый случай с кодом 500--------------------------------------------------------
-	m.EXPECT().Get(gomock.Any(), "id of 500 code").Return(nil, 0, fmt.Errorf("error"))
+	m.EXPECT().GetWithdrawals(gomock.Any(), "id of 500 code").Return(nil, 0, fmt.Errorf("error"))
 
 	tests := []struct {
 		name       string

@@ -47,13 +47,13 @@ const (
 type Order struct {
 	Number     int64     `json:"number"`      // номер заказа
 	Status     string    `json:"status"`      // стату обработки заказа
-	Accrual    int       `json:"accrual"`     // сумма начисленных бонусов за заказ
+	Accrual    float64       `json:"accrual"`     // сумма начисленных бонусов за заказ
 	UploadedAt time.Time `json:"uploaded_at"` // время загрузки заказа
 }
 
 type OrdersInterface interface {
 	Load(ctx context.Context, idUser string, orderNumber string) (status int, err error) // load order in storage. Gets context, id of user, order number of user. Returns different status codes and posible error
-	Get(ctx context.Context, idUser string) (orders []Order, status int, err error)      // get list of orders. List is sortied by data of loading. Gets context, id of user. Returns list, status and error
+	GetOrders(ctx context.Context, idUser string) (orders []Order, status int, err error)      // get list of orders. List is sortied by data of loading. Gets context, id of user. Returns list, status and error
 }
 
 //--------------------------------------------------------------------------------------------------------------------
@@ -64,7 +64,7 @@ type Balance struct {
 }
 
 type BalanceInterface interface {
-	Get(ctx context.Context, idUser string) (balance Balance, err error) // For getting current balance of user. Gets context, id of user. Returns balance and error.
+	GetBalance(ctx context.Context, idUser string) (balance Balance, err error) // For getting current balance of user. Gets context, id of user. Returns balance and error.
 }
 
 //-----------------------------------------------------------------------------------------------------
@@ -97,5 +97,5 @@ type Withdrawals struct {
 }
 
 type WithdrawalsInterface interface {
-	Get(ctx context.Context, idUser string) (withdrawals []Withdrawals, status int, err error) // get information about withdrawals. Gets context, id of user. Return list of withdrawals, status and error
+	GetWithdrawals(ctx context.Context, idUser string) (withdrawals []Withdrawals, status int, err error) // get information about withdrawals. Gets context, id of user. Return list of withdrawals, status and error
 }

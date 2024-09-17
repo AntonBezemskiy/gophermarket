@@ -54,18 +54,32 @@ func (s Store) Bootstrap(ctx context.Context) (err error) {
         CREATE TABLE IF NOT EXISTS orders (
 			number bigint PRIMARY KEY,
 			status varchar(128),
-			accrual INTEGER,
+			accrual double precision,
 			uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			id_user varchar(128)
         )
     `)
-	// создаю уникальный индекс для статуса
+	// создаю индекс для статуса
 	_, err = tx.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS status ON orders (status)`)
 	if err != nil {
 		return err
 	}
-	// создаю уникальный индекс для id пользователя
+	// создаю индекс для id пользователя
 	_, err = tx.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS id_user ON orders (id_user)`)
+	if err != nil {
+		return err
+	}
+
+	// создаю таблицу для хранения баланса пользователя-------------------------------------------------------------
+	_, err = tx.ExecContext(ctx, `
+		CREATE TABLE IF NOT EXISTS balance (
+			id_user varchar(128) PRIMARY KEY,
+			current double precision,
+			withdrawn double precision
+		)
+	`)
+	// создаю уникальный индекс для статуса
+	_, err = tx.ExecContext(ctx, `CREATE UNIQUE INDEX IF NOT EXISTS id_user ON balance (id_user)`)
 	if err != nil {
 		return err
 	}
@@ -106,6 +120,7 @@ func (s Store) Disable(ctx context.Context) (err error) {
 	return tx.Commit()
 }
 
+// Регистрация пользователя в системе. Создаю таблицу с учетными данными пользователя, а так-же таблицу с балансом пользователя
 func (s Store) Register(ctx context.Context, login string, password string) (ok bool, token string, err error) {
 	// проверка валидности логина и пароля
 	// наверное лучше вместо ошибки возвращать статус вроде http.StatusBadRequest
@@ -152,6 +167,23 @@ func (s Store) Register(ctx context.Context, login string, password string) (ok 
 	if err != nil {
 		return
 	}
+
+	// создаю в таблице balance запись о балансе нового пользователя
+	// для этого получаю id пользователя из сгенерированного токена
+	id, errID := auth.GetUserID(token)
+	if errID != nil {
+		err = errID
+		return
+	}
+	createBalanceData := `
+				INSERT INTO balance (id_user, current, withdrawn)
+				VALUES ($1, $2, $3);
+				`
+	_, err = s.conn.ExecContext(ctx, createBalanceData, id, 0, 0)
+	if err != nil {
+		return
+	}
+
 	ok = true
 	return
 }
@@ -251,7 +283,7 @@ func (s Store) Load(ctx context.Context, idUser string, orderNumber string) (sta
 	return
 }
 
-func (s Store) Get(ctx context.Context, idUser string) (orders []repositories.Order, status int, err error) {
+func (s Store) GetOrders(ctx context.Context, idUser string) (orders []repositories.Order, status int, err error) {
 	orders = make([]repositories.Order, 0)
 
 	// выгружаю все заказы, которые соответствуют данному польззователя. Сортировка по времени от самых новых к самым старым заказам
@@ -273,13 +305,6 @@ func (s Store) Get(ctx context.Context, idUser string) (orders []repositories.Or
 	}
 	// обязательно закрываем перед возвратом функции
 	defer rows.Close()
-
-	// // проверяем, есть ли у данного пользователя заказы
-	// if !rows.Next() {
-	// 	// пользователя не загрузил ни одного заказа, возвращаю статус 204
-	// 	status = repositories.GETORDERSCODE204
-	// 	return
-	// }
 
 	ordersExist := false
 	// собираю заказы для ответа сервера
@@ -306,5 +331,23 @@ func (s Store) Get(ctx context.Context, idUser string) (orders []repositories.Or
 		return
 	}
 	status = repositories.GETORDERSCODE200
+	return
+}
+
+func (s Store) GetBalance(ctx context.Context, idUser string) (balance repositories.Balance, err error) {
+	query := `
+		SELECT
+			current,
+			withdrawn
+		FROM balance
+		WHERE id_user = $1
+	`
+	// получаю баланс пользователя
+	row := s.conn.QueryRowContext(ctx, query, idUser)
+	err = row.Scan(&balance.Current, &balance.Withdrawn)
+	if err != nil {
+		// запись о балансе пользователя создается сразу при регистрации, поэтому отсутствие записи это внутренняя ошибка
+		return
+	}
 	return
 }

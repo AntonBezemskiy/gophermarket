@@ -90,20 +90,20 @@ func (m *MockOrdersInterface) EXPECT() *MockOrdersInterfaceMockRecorder {
 	return m.recorder
 }
 
-// Get mocks base method.
-func (m *MockOrdersInterface) Get(arg0 context.Context, arg1 string) ([]repositories.Order, int, error) {
+// GetOrders mocks base method.
+func (m *MockOrdersInterface) GetOrders(arg0 context.Context, arg1 string) ([]repositories.Order, int, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Get", arg0, arg1)
+	ret := m.ctrl.Call(m, "GetOrders", arg0, arg1)
 	ret0, _ := ret[0].([]repositories.Order)
 	ret1, _ := ret[1].(int)
 	ret2, _ := ret[2].(error)
 	return ret0, ret1, ret2
 }
 
-// Get indicates an expected call of Get.
-func (mr *MockOrdersInterfaceMockRecorder) Get(arg0, arg1 interface{}) *gomock.Call {
+// GetOrders indicates an expected call of GetOrders.
+func (mr *MockOrdersInterfaceMockRecorder) GetOrders(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockOrdersInterface)(nil).Get), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOrders", reflect.TypeOf((*MockOrdersInterface)(nil).GetOrders), arg0, arg1)
 }
 
 // Load mocks base method.
@@ -144,19 +144,19 @@ func (m *MockBalanceInterface) EXPECT() *MockBalanceInterfaceMockRecorder {
 	return m.recorder
 }
 
-// Get mocks base method.
-func (m *MockBalanceInterface) Get(arg0 context.Context, arg1 string) (repositories.Balance, error) {
+// GetBalance mocks base method.
+func (m *MockBalanceInterface) GetBalance(arg0 context.Context, arg1 string) (repositories.Balance, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Get", arg0, arg1)
+	ret := m.ctrl.Call(m, "GetBalance", arg0, arg1)
 	ret0, _ := ret[0].(repositories.Balance)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// Get indicates an expected call of Get.
-func (mr *MockBalanceInterfaceMockRecorder) Get(arg0, arg1 interface{}) *gomock.Call {
+// GetBalance indicates an expected call of GetBalance.
+func (mr *MockBalanceInterfaceMockRecorder) GetBalance(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockBalanceInterface)(nil).Get), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBalance", reflect.TypeOf((*MockBalanceInterface)(nil).GetBalance), arg0, arg1)
 }
 
 // MockWithdrawInterface is a mock of WithdrawInterface interface.
@@ -220,18 +220,18 @@ func (m *MockWithdrawalsInterface) EXPECT() *MockWithdrawalsInterfaceMockRecorde
 	return m.recorder
 }
 
-// Get mocks base method.
-func (m *MockWithdrawalsInterface) Get(arg0 context.Context, arg1 string) ([]repositories.Withdrawals, int, error) {
+// GetWithdrawals mocks base method.
+func (m *MockWithdrawalsInterface) GetWithdrawals(arg0 context.Context, arg1 string) ([]repositories.Withdrawals, int, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Get", arg0, arg1)
+	ret := m.ctrl.Call(m, "GetWithdrawals", arg0, arg1)
 	ret0, _ := ret[0].([]repositories.Withdrawals)
 	ret1, _ := ret[1].(int)
 	ret2, _ := ret[2].(error)
 	return ret0, ret1, ret2
 }
 
-// Get indicates an expected call of Get.
-func (mr *MockWithdrawalsInterfaceMockRecorder) Get(arg0, arg1 interface{}) *gomock.Call {
+// GetWithdrawals indicates an expected call of GetWithdrawals.
+func (mr *MockWithdrawalsInterfaceMockRecorder) GetWithdrawals(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockWithdrawalsInterface)(nil).Get), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetWithdrawals", reflect.TypeOf((*MockWithdrawalsInterface)(nil).GetWithdrawals), arg0, arg1)
 }

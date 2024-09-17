@@ -134,7 +134,7 @@ func GetOrders(res http.ResponseWriter, req *http.Request, order repositories.Or
 	res.Header().Set("Content-Type", "application/json")
 	defer req.Body.Close()
 
-	orders, code, err := order.Get(req.Context(), id)
+	orders, code, err := order.GetOrders(req.Context(), id)
 	if err != nil {
 		logger.ServerLog.Error("get orders error", zap.String("address", req.URL.String()), zap.String("error", err.Error()))
 		http.Error(res, "get orders error", http.StatusInternalServerError)
@@ -175,7 +175,7 @@ func GetBalance(res http.ResponseWriter, req *http.Request, blnc repositories.Ba
 	res.Header().Set("Content-Type", "application/json")
 	defer req.Body.Close()
 
-	balance, err := blnc.Get(req.Context(), id)
+	balance, err := blnc.GetBalance(req.Context(), id)
 	if err != nil {
 		logger.ServerLog.Error("get balance error", zap.String("address", req.URL.String()), zap.String("error", err.Error()))
 		http.Error(res, "get balance error", http.StatusInternalServerError)
@@ -249,7 +249,7 @@ func Withdrawals(res http.ResponseWriter, req *http.Request, wthdrwls repositori
 	res.Header().Set("Content-Type", "application/json")
 	defer req.Body.Close()
 
-	withdrawals, code, err := wthdrwls.Get(req.Context(), id)
+	withdrawals, code, err := wthdrwls.GetWithdrawals(req.Context(), id)
 	if err != nil {
 		logger.ServerLog.Error("get withdrawals error", zap.String("address", req.URL.String()), zap.String("error", err.Error()))
 		http.Error(res, "get withdrawals error", http.StatusInternalServerError)
