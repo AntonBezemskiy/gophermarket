@@ -5,6 +5,14 @@ import (
 	"time"
 )
 
+// Статусы обработки заказа в виде строки, чтобы информация в базе даных выглядела более информативно
+const (
+	NEW        = "NEW"
+	PROCESSING = "PROCESSING"
+	INVALID    = "INVALID"
+	PROCESSED  = "PROCESSED"
+)
+
 type AuthInterface interface {
 	Register(ctx context.Context, login string, password string) (ok bool, token string, err error)     // return values is Ok, token and error. Ok is false when login of user is not unique
 	Authenticate(ctx context.Context, login string, password string) (ok bool, token string, err error) // return values is Ok, token and error. Ok is false when login or password of user is wrong

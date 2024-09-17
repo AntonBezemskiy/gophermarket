@@ -4,8 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strconv"
 
 	"github.com/AntonBezemskiy/gophermart/internal/auth"
+	"github.com/AntonBezemskiy/gophermart/internal/repositories"
+	"github.com/AntonBezemskiy/gophermart/internal/tools"
 )
 
 // Store реализует интерфейс store.Store и позволяет взаимодействовать с СУБД PostgreSQL
@@ -29,7 +32,7 @@ func (s Store) Bootstrap(ctx context.Context) (err error) {
 	// откат транзакции в случае ошибки
 	defer tx.Rollback()
 
-	// создаю таблицу для хранения данных пользователя.
+	// создаю таблицу для хранения данных пользователя. ----------------------------------------------
 	_, err = tx.ExecContext(ctx, `
         CREATE TABLE IF NOT EXISTS auth (
             login varchar(128) PRIMARY KEY,
@@ -40,9 +43,29 @@ func (s Store) Bootstrap(ctx context.Context) (err error) {
 	if err != nil {
 		return err
 	}
-
 	// создаю уникальный индекс для логина
 	_, err = tx.ExecContext(ctx, `CREATE UNIQUE INDEX IF NOT EXISTS login ON auth (login)`)
+	if err != nil {
+		return err
+	}
+
+	// создаю таблицу для хранения заказов-------------------------------------------------------------
+	_, err = tx.ExecContext(ctx, `
+        CREATE TABLE IF NOT EXISTS orders (
+			number bigint PRIMARY KEY,
+			status varchar(128),
+			accrual INTEGER,
+			uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			id_user varchar(128)
+        )
+    `)
+	// создаю уникальный индекс для статуса
+	_, err = tx.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS status ON orders (status)`)
+	if err != nil {
+		return err
+	}
+	// создаю уникальный индекс для id пользователя
+	_, err = tx.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS id_user ON orders (id_user)`)
 	if err != nil {
 		return err
 	}
@@ -66,6 +89,14 @@ func (s Store) Disable(ctx context.Context) (err error) {
 	// удаляю все записи в таблице auth
 	_, err = tx.ExecContext(ctx, `
 			TRUNCATE TABLE auth 
+	`)
+	if err != nil {
+		return err
+	}
+
+	// удаляю все записи в таблице orders
+	_, err = tx.ExecContext(ctx, `
+			TRUNCATE TABLE orders 
 	`)
 	if err != nil {
 		return err
@@ -96,6 +127,7 @@ func (s Store) Register(ctx context.Context, login string, password string) (ok 
 	if err != nil {
 		if err == sql.ErrNoRows {
 			// логин уникален, продолжаем регистрацию
+			err = nil
 		} else {
 			// Ошибка метода Scan
 			return
@@ -154,12 +186,71 @@ func (s Store) Authenticate(ctx context.Context, login string, password string) 
 			return
 		}
 	}
-	
+
 	// проверяю указанный пароль на соотвествие с тем, что хранится в базе
 	if password != passwordFromDB {
 		ok = false
 		return
 	}
 	ok = true
+	return
+}
+
+func (s Store) Load(ctx context.Context, idUser string, orderNumber string) (status int, err error) {
+	check := tools.LuhnCheck(orderNumber)
+	if !check {
+		status = repositories.ORDERSCODE422
+		return
+	}
+
+	// Преобразую номер заказа из строки в int64
+	orderNumberInt, err := strconv.ParseInt(orderNumber, 10, 64)
+	if err != nil {
+		err = fmt.Errorf("error of converting string to int64: %w", err)
+		return
+	}
+
+	query := `
+		SELECT
+			id_user
+		FROM orders
+		WHERE number = $1
+	`
+	// проверяю, что заказ с данным номером ещё не был добавлен в систему
+	row := s.conn.QueryRowContext(ctx, query, orderNumberInt)
+	var idFromDB string
+	err = row.Scan(&idFromDB)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			// заказ ещё не был загружен в систему, можно продолжать процесс загрузки
+			err = nil
+		} else {
+			// Ошибка метода Scan
+			return
+		}
+	} else {
+		if idFromDB == idUser {
+			// заказ уже загружен этим пользователем
+			status = repositories.ORDERSCODE200
+			return
+		} else {
+			// заказ был загружен другим пользователем
+			status = repositories.ORDERSCODE409
+			return
+		}
+	}
+	registerUser := `
+				INSERT INTO orders (number, status, accrual, id_user)
+				VALUES ($1, $2, $3, $4);
+				`
+	_, err = s.conn.ExecContext(ctx, registerUser, orderNumberInt, repositories.NEW, 0, idUser)
+	if err != nil {
+		return
+	}
+	status = repositories.ORDERSCODE202
+	return
+}
+
+func (s Store) Get(ctx context.Context, idUser string) (orders []repositories.Order, status int, err error) {
 	return
 }

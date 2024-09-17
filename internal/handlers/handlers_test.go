@@ -518,90 +518,203 @@ func TestAuthentication(t *testing.T) {
 }
 
 func TestLoadOrders(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	{
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
 
-	m := mocks.NewMockOrdersInterface(ctrl)
+		m := mocks.NewMockOrdersInterface(ctrl)
 
-	// тестовый случай с кодом 200--------------------------------------------------------
-	m.EXPECT().Load(gomock.Any(), gomock.Any(), "succes order number, code 200").Return(200, nil)
-	// Создаю тело запроса номером заказа
-	orderNumb200 := []byte("succes order number, code 200")
+		// тестовый случай с кодом 200--------------------------------------------------------
+		m.EXPECT().Load(gomock.Any(), gomock.Any(), "succes order number, code 200").Return(200, nil)
+		// Создаю тело запроса номером заказа
+		orderNumb200 := []byte("succes order number, code 200")
 
-	// тестовый случай с кодом 200--------------------------------------------------------
-	m.EXPECT().Load(gomock.Any(), "success ID", "succes order number, code 200").Return(200, nil)
-	// Создаю тело запроса номером заказа
-	orderNumb200WithID := []byte("succes order number, code 200")
+		// тестовый случай с кодом 200--------------------------------------------------------
+		m.EXPECT().Load(gomock.Any(), "success ID", "succes order number, code 200").Return(200, nil)
+		// Создаю тело запроса номером заказа
+		orderNumb200WithID := []byte("succes order number, code 200")
 
-	// тестовый случай с кодом 202--------------------------------------------------------
-	m.EXPECT().Load(gomock.Any(), gomock.Any(), "succes order number, code 202").Return(202, nil)
-	// Создаю тело запроса номером заказа
-	orderNumb202 := []byte("succes order number, code 202")
+		// тестовый случай с кодом 202--------------------------------------------------------
+		m.EXPECT().Load(gomock.Any(), gomock.Any(), "succes order number, code 202").Return(202, nil)
+		// Создаю тело запроса номером заказа
+		orderNumb202 := []byte("succes order number, code 202")
 
-	// тестовый случай с кодом 409--------------------------------------------------------
-	m.EXPECT().Load(gomock.Any(), gomock.Any(), "code 409").Return(409, nil)
-	// Создаю тело запроса номером заказа
-	orderNumb409 := []byte("code 409")
+		// тестовый случай с кодом 409--------------------------------------------------------
+		m.EXPECT().Load(gomock.Any(), gomock.Any(), "code 409").Return(409, nil)
+		// Создаю тело запроса номером заказа
+		orderNumb409 := []byte("code 409")
 
-	// тестовый случай с кодом 409--------------------------------------------------------
-	m.EXPECT().Load(gomock.Any(), gomock.Any(), "code 500").Return(0, fmt.Errorf("load order error"))
-	// Создаю тело запроса номером заказа
-	orderNumb500 := []byte("code 500")
+		// тестовый случай с кодом 500--------------------------------------------------------
+		m.EXPECT().Load(gomock.Any(), gomock.Any(), "code 500").Return(0, fmt.Errorf("load order error"))
+		// Создаю тело запроса номером заказа
+		orderNumb500 := []byte("code 500")
 
-	tests := []struct {
-		name       string
-		body       io.Reader
-		id         string
-		wantStatus int
-		wantError  bool
-	}{
-		{
-			name:       "code 200",
-			body:       bytes.NewReader(orderNumb200),
-			id:         "test id",
-			wantStatus: 200,
-		},
-		{
-			name:       "code 200 with ID",
-			body:       bytes.NewReader(orderNumb200WithID),
-			id:         "success ID",
-			wantStatus: 200,
-		},
-		{
-			name:       "code 202",
-			body:       bytes.NewReader(orderNumb202),
-			wantStatus: 202,
-		},
-		{
-			name:       "code 409",
-			body:       bytes.NewReader(orderNumb409),
-			wantStatus: 409,
-		},
-		{
-			name:       "code 500",
-			body:       bytes.NewReader(orderNumb500),
-			wantStatus: 500,
-		},
+		tests := []struct {
+			name       string
+			body       io.Reader
+			id         string
+			wantStatus int
+			wantError  bool
+		}{
+			{
+				name:       "code 200",
+				body:       bytes.NewReader(orderNumb200),
+				id:         "test id",
+				wantStatus: 200,
+			},
+			{
+				name:       "code 200 with ID",
+				body:       bytes.NewReader(orderNumb200WithID),
+				id:         "success ID",
+				wantStatus: 200,
+			},
+			{
+				name:       "code 202",
+				body:       bytes.NewReader(orderNumb202),
+				wantStatus: 202,
+			},
+			{
+				name:       "code 409",
+				body:       bytes.NewReader(orderNumb409),
+				wantStatus: 409,
+			},
+			{
+				name:       "code 500",
+				body:       bytes.NewReader(orderNumb500),
+				wantStatus: 500,
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				r := chi.NewRouter()
+				r.Post("/api/user/orders", LoadOrdersHandler(m))
+
+				request := httptest.NewRequest(http.MethodPost, "/api/user/orders", tt.body)
+				w := httptest.NewRecorder()
+
+				// Устанавливаю id пользователя в контекст
+				ctx := context.WithValue(request.Context(), auth.UserIDKey, tt.id)
+
+				r.ServeHTTP(w, request.WithContext(ctx))
+
+				res := w.Result()
+				defer res.Body.Close() // Закрываем тело ответа
+
+				// Проверяю код ответа
+				assert.Equal(t, tt.wantStatus, res.StatusCode)
+			})
+		}
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			r := chi.NewRouter()
-			r.Post("/api/user/orders", LoadOrdersHandler(m))
+	// тесты с базой данных
+	// предварительно необходимо создать тестовую БД и определить параметры сединения host=host user=user password=password dbname=dbname  sslmode=disable
+	{
+		// инициализация базы данных-------------------------------------------------------------------
+		databaseDsn := "host=localhost user=testgophermart password=newpassword dbname=testgophermart sslmode=disable"
 
-			request := httptest.NewRequest(http.MethodPost, "/api/user/orders", tt.body)
-			w := httptest.NewRecorder()
+		// создаём соединение с СУБД PostgreSQL
+		conn, err := sql.Open("pgx", databaseDsn)
+		require.NoError(t, err)
+		defer conn.Close()
 
-			// Устанавливаю id пользователя в контекст
-			ctx := context.WithValue(request.Context(), auth.UserIDKey, tt.id)
+		// Проверка соединения с БД
+		ctx := context.Background()
+		err = conn.PingContext(ctx)
+		require.NoError(t, err)
 
-			r.ServeHTTP(w, request.WithContext(ctx))
+		// создаем экземпляр хранилища pg
+		stor := pg.NewStore(conn)
+		err = stor.Bootstrap(ctx)
+		require.NoError(t, err)
+		//------------------------------------------------------------------------------------------------------
 
-			res := w.Result()
-			defer res.Body.Close() // Закрываем тело ответа
+		// тестовый случай с кодом 202--------------------------------------------------------
+		orderNumb202 := []byte("562246784655")
 
-			// Проверяю код ответа
-			assert.Equal(t, tt.wantStatus, res.StatusCode)
-		})
+		// тестовый случай с кодом 200--------------------------------------------------------
+		// Создаю тело запроса номером заказа
+		orderNumb200 := []byte("562246784655")
+
+		// тестовый случай с кодом 200--------------------------------------------------------
+		orderNumb200WithID := []byte("562246784655")
+
+		// тестовый случай с кодом 202--------------------------------------------------------
+		// для последующей отработки случая, когда заказ добавлен другим пользователем
+		orderNumbFor409 := []byte("802252051072")
+
+		// тестовый случай с кодом 409--------------------------------------------------------
+		orderNumb409 := []byte("802252051072")
+
+		// тестовый случай с кодом 422--------------------------------------------------------
+		orderNumb500 := []byte("1234")
+
+		tests := []struct {
+			name       string
+			body       io.Reader
+			id         string
+			wantStatus int
+			wantError  bool
+		}{
+			{
+				name:       "code 202",
+				body:       bytes.NewReader(orderNumb202),
+				id:         "user ID",
+				wantStatus: 202,
+			},
+			{
+				name:       "code 200",
+				body:       bytes.NewReader(orderNumb200),
+				id:         "user ID",
+				wantStatus: 200,
+			},
+			{
+				name:       "code 200 with ID",
+				body:       bytes.NewReader(orderNumb200WithID),
+				id:         "user ID",
+				wantStatus: 200,
+			},
+			{
+				name:       "code 202 before 409",
+				body:       bytes.NewReader(orderNumbFor409),
+				id:         "user ID before 409",
+				wantStatus: 202,
+			},
+			{
+				name:       "code 409",
+				body:       bytes.NewReader(orderNumb409),
+				id:         "different user id 409",
+				wantStatus: 409,
+			},
+			{
+				name:       "code 422",
+				body:       bytes.NewReader(orderNumb500),
+				id:         "user ID",
+				wantStatus: 422,
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				r := chi.NewRouter()
+				r.Post("/api/user/orders", LoadOrdersHandler(stor))
+
+				request := httptest.NewRequest(http.MethodPost, "/api/user/orders", tt.body)
+				w := httptest.NewRecorder()
+
+				// Устанавливаю id пользователя в контекст
+				ctx := context.WithValue(request.Context(), auth.UserIDKey, tt.id)
+
+				r.ServeHTTP(w, request.WithContext(ctx))
+
+				res := w.Result()
+				defer res.Body.Close() // Закрываем тело ответа
+
+				// Проверяю код ответа
+				assert.Equal(t, tt.wantStatus, res.StatusCode)
+			})
+		}
+
+		// Удаление данных из тестовых таблиц для выполнения следующих тестов------------------------------------------
+		err = stor.Disable(ctx)
+		require.NoError(t, err)
 	}
 }
 

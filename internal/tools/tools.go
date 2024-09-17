@@ -1,9 +1,12 @@
 package tools
 
-import "strconv"
+import (
+	"strconv"
 
-// LuhnCheck проверяет номер с использованием алгоритма Луна
-func LuhnCheck(number string) bool {
+	"github.com/joeljunstrom/go-luhn"
+)
+
+func MyLuhnCheck(number string) bool {
 	sum := 0
 	shouldDouble := false
 
@@ -28,4 +31,10 @@ func LuhnCheck(number string) bool {
 
 	// Проверяю делимость суммы на 10
 	return sum%10 == 0
+}
+
+// LuhnCheck проверяет номер с использованием алгоритма Луна
+func LuhnCheck(number string) bool {
+	// использую готовое решение "github.com/joeljunstrom/go-luhn"
+	return luhn.Valid(number)
 }
