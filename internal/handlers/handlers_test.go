@@ -1089,116 +1089,146 @@ func TestGetBalance(t *testing.T) {
 }
 
 func TestWithdraw(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	// тесты с моками
+	{
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
 
-	m := mocks.NewMockWithdrawInterface(ctrl)
+		m := mocks.NewMockWithdrawInterface(ctrl)
 
-	// тестовый случай с кодом 200--------------------------------------------------------
-	withdraw200 := repositories.WithdrawRequest{
-		Order: "1234",
-		Sum:   100,
+		// тестовый случай с кодом 200--------------------------------------------------------
+		withdraw200 := repositories.WithdrawRequest{
+			Order: "1234",
+			Sum:   100,
+		}
+		var body200 bytes.Buffer
+		enc := json.NewEncoder(&body200)
+		err := enc.Encode(withdraw200)
+		require.NoError(t, err)
+
+		m.EXPECT().Withdraw(gomock.Any(), "id of 200 code", "1234", 100).Return(repositories.WITHDRAWCODE200, nil)
+
+		// тестовый случай с кодом 402--------------------------------------------------------
+		withdraw402 := repositories.WithdrawRequest{
+			Order: "1234",
+			Sum:   2000,
+		}
+		var body402 bytes.Buffer
+		enc402 := json.NewEncoder(&body402)
+		err = enc402.Encode(withdraw402)
+		require.NoError(t, err)
+
+		m.EXPECT().Withdraw(gomock.Any(), "id of 402 code", "1234", 2000).Return(repositories.WITHDRAWCODE402, nil)
+
+		// тестовый случай с кодом 422--------------------------------------------------------
+		withdraw422 := repositories.WithdrawRequest{
+			Order: "wrrong number of order",
+			Sum:   2000,
+		}
+		var body422 bytes.Buffer
+		enc422 := json.NewEncoder(&body422)
+		err = enc422.Encode(withdraw422)
+		require.NoError(t, err)
+
+		m.EXPECT().Withdraw(gomock.Any(), "id of 422 code", "wrrong number of order", 2000).Return(repositories.WITHDRAWCODE422, nil)
+
+		// тестовый случай с кодом 500--------------------------------------------------------
+		withdraw500 := repositories.WithdrawRequest{
+			Order: "12345",
+			Sum:   2000,
+		}
+		var body500 bytes.Buffer
+		enc500 := json.NewEncoder(&body500)
+		err = enc500.Encode(withdraw500)
+		require.NoError(t, err)
+
+		m.EXPECT().Withdraw(gomock.Any(), "id of 500 code", "12345", 2000).Return(0, fmt.Errorf("error"))
+
+		tests := []struct {
+			name       string
+			body       io.Reader
+			id         string
+			wantStatus int
+			wantError  bool
+		}{
+			{
+				name:       "code 200",
+				body:       bytes.NewReader(body200.Bytes()),
+				id:         "id of 200 code",
+				wantStatus: 200,
+			},
+			{
+				name:       "code 402",
+				body:       bytes.NewReader(body402.Bytes()),
+				id:         "id of 402 code",
+				wantStatus: 402,
+			},
+			{
+				name:       "code 422",
+				body:       bytes.NewReader(body422.Bytes()),
+				id:         "id of 422 code",
+				wantStatus: 422,
+			},
+			{
+				name:       "code 500",
+				body:       bytes.NewReader(body500.Bytes()),
+				id:         "id of 500 code",
+				wantStatus: 500,
+			},
+			{
+				name:       "code 400",
+				body:       bytes.NewReader([]byte("wrong body")),
+				id:         "id of 400 code",
+				wantStatus: 400,
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				r := chi.NewRouter()
+				r.Post("/api/user/balance/withdraw", WithdrawHandler(m))
+
+				request := httptest.NewRequest(http.MethodPost, "/api/user/balance/withdraw", tt.body)
+				w := httptest.NewRecorder()
+
+				// Устанавливаю id пользователя в контекст
+				ctx := context.WithValue(request.Context(), auth.UserIDKey, tt.id)
+
+				r.ServeHTTP(w, request.WithContext(ctx))
+
+				res := w.Result()
+				defer res.Body.Close() // Закрываем тело ответа
+
+				// Проверяю код ответа
+				assert.Equal(t, tt.wantStatus, res.StatusCode)
+			})
+		}
 	}
-	var body200 bytes.Buffer
-	enc := json.NewEncoder(&body200)
-	err := enc.Encode(withdraw200)
-	require.NoError(t, err)
+	// тесты с базой данных
+	// предварительно необходимо создать тестовую БД и определить параметры сединения host=host user=user password=password dbname=dbname  sslmode=disable
+	{
+		// инициализация базы данных-------------------------------------------------------------------
+		databaseDsn := "host=localhost user=testgophermart password=newpassword dbname=testgophermart sslmode=disable"
 
-	m.EXPECT().Withdraw(gomock.Any(), "id of 200 code", "1234", 100).Return(repositories.WITHDRAWCODE200, nil)
+		// создаём соединение с СУБД PostgreSQL
+		conn, err := sql.Open("pgx", databaseDsn)
+		require.NoError(t, err)
+		defer conn.Close()
 
-	// тестовый случай с кодом 402--------------------------------------------------------
-	withdraw402 := repositories.WithdrawRequest{
-		Order: "1234",
-		Sum:   2000,
-	}
-	var body402 bytes.Buffer
-	enc402 := json.NewEncoder(&body402)
-	err = enc402.Encode(withdraw402)
-	require.NoError(t, err)
+		// Проверка соединения с БД
+		ctx := context.Background()
+		err = conn.PingContext(ctx)
+		require.NoError(t, err)
 
-	m.EXPECT().Withdraw(gomock.Any(), "id of 402 code", "1234", 2000).Return(repositories.WITHDRAWCODE402, nil)
+		// создаем экземпляр хранилища pg
+		stor := pg.NewStore(conn)
+		err = stor.Bootstrap(ctx)
+		require.NoError(t, err)
+		//-------------------------------------------------------------------------------------------------------------
 
-	// тестовый случай с кодом 422--------------------------------------------------------
-	withdraw422 := repositories.WithdrawRequest{
-		Order: "wrrong number of order",
-		Sum:   2000,
-	}
-	var body422 bytes.Buffer
-	enc422 := json.NewEncoder(&body422)
-	err = enc422.Encode(withdraw422)
-	require.NoError(t, err)
 
-	m.EXPECT().Withdraw(gomock.Any(), "id of 422 code", "wrrong number of order", 2000).Return(repositories.WITHDRAWCODE422, nil)
-
-	// тестовый случай с кодом 500--------------------------------------------------------
-	withdraw500 := repositories.WithdrawRequest{
-		Order: "12345",
-		Sum:   2000,
-	}
-	var body500 bytes.Buffer
-	enc500 := json.NewEncoder(&body500)
-	err = enc500.Encode(withdraw500)
-	require.NoError(t, err)
-
-	m.EXPECT().Withdraw(gomock.Any(), "id of 500 code", "12345", 2000).Return(0, fmt.Errorf("error"))
-
-	tests := []struct {
-		name       string
-		body       io.Reader
-		id         string
-		wantStatus int
-		wantError  bool
-	}{
-		{
-			name:       "code 200",
-			body:       bytes.NewReader(body200.Bytes()),
-			id:         "id of 200 code",
-			wantStatus: 200,
-		},
-		{
-			name:       "code 402",
-			body:       bytes.NewReader(body402.Bytes()),
-			id:         "id of 402 code",
-			wantStatus: 402,
-		},
-		{
-			name:       "code 422",
-			body:       bytes.NewReader(body422.Bytes()),
-			id:         "id of 422 code",
-			wantStatus: 422,
-		},
-		{
-			name:       "code 500",
-			body:       bytes.NewReader(body500.Bytes()),
-			id:         "id of 500 code",
-			wantStatus: 500,
-		},
-		{
-			name:       "code 400",
-			body:       bytes.NewReader([]byte("wrong body")),
-			id:         "id of 400 code",
-			wantStatus: 400,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			r := chi.NewRouter()
-			r.Post("/api/user/balance/withdraw", WithdrawHandler(m))
-
-			request := httptest.NewRequest(http.MethodPost, "/api/user/balance/withdraw", tt.body)
-			w := httptest.NewRecorder()
-
-			// Устанавливаю id пользователя в контекст
-			ctx := context.WithValue(request.Context(), auth.UserIDKey, tt.id)
-
-			r.ServeHTTP(w, request.WithContext(ctx))
-
-			res := w.Result()
-			defer res.Body.Close() // Закрываем тело ответа
-
-			// Проверяю код ответа
-			assert.Equal(t, tt.wantStatus, res.StatusCode)
-		})
+		// Удаление данных из тестовых таблиц для выполнения следующих тестов------------------------------------------
+		err = stor.Disable(ctx)
+		require.NoError(t, err)
 	}
 }
 

@@ -77,11 +77,11 @@ const (
 
 type WithdrawRequest struct {
 	Order string `json:"order"` // номер заказа
-	Sum   int    `json:"sum"`   // сумма баллов к списанию в счёт оплаты
+	Sum   float64    `json:"sum"`   // сумма баллов к списанию в счёт оплаты
 }
 
 type WithdrawInterface interface {
-	Withdraw(ctx context.Context, idUser string, orderNumber string, sum int) (status int, err error) // request for withdrawal of funds. Gets context, id of user, order number of user, sum to withdraw. Return code and error.
+	Withdraw(ctx context.Context, idUser string, orderNumber string, sum float64) (status int, err error) // request for withdrawal of funds. Gets context, id of user, order number of user, sum to withdraw. Return code and error.
 }
 
 // -----------------------------------------------------------------------------------------------------
@@ -92,7 +92,7 @@ const (
 
 type Withdrawals struct {
 	Order     string    `json:"order"`        // номер заказа
-	Sum       int       `json:"sum"`          // вывод средств
+	Sum       float64       `json:"sum"`          // вывод средств
 	ProcessAt time.Time `json:"processed_at"` // дата вывода средств
 }
 

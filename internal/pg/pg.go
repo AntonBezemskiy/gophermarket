@@ -84,6 +84,21 @@ func (s Store) Bootstrap(ctx context.Context) (err error) {
 		return err
 	}
 
+	// создаю таблицу для хранения информации о выводе средств
+	_, err = tx.ExecContext(ctx, `
+		CREATE TABLE IF NOT EXISTS withdrawals (
+			number bigint PRIMARY KEY,
+			withdrawn double precision,
+			processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			id_user varchar(128)
+		)
+	`)
+	// создаю уникальный индекс номера заказа
+	_, err = tx.ExecContext(ctx, `CREATE UNIQUE INDEX IF NOT EXISTS number ON withdrawals (number)`)
+	if err != nil {
+		return err
+	}
+
 	// коммитим транзакцию
 	err = tx.Commit()
 	return err
@@ -108,9 +123,17 @@ func (s Store) Disable(ctx context.Context) (err error) {
 		return err
 	}
 
-	// удаляю все записи в таблице orders
+	// удаляю все записи в таблице balance
 	_, err = tx.ExecContext(ctx, `
-			TRUNCATE TABLE orders 
+			TRUNCATE TABLE balance 
+	`)
+	if err != nil {
+		return err
+	}
+
+	// удаляю все записи в таблице withdrawals
+	_, err = tx.ExecContext(ctx, `
+			TRUNCATE TABLE withdrawals 
 	`)
 	if err != nil {
 		return err
@@ -349,5 +372,94 @@ func (s Store) GetBalance(ctx context.Context, idUser string) (balance repositor
 		// запись о балансе пользователя создается сразу при регистрации, поэтому отсутствие записи это внутренняя ошибка
 		return
 	}
+	return
+}
+
+// Запрос на списание средств
+func (s Store) Withdraw(ctx context.Context, idUser string, orderNumber string, sum float64) (status int, err error) {
+	// Проверяю кооректность номера заказа. Номер заказа некорректный в случае если он не проходит проверку по алгоритму Луна
+	// или если такой заказ уже существует в сервисе
+	check := tools.LuhnCheck(orderNumber)
+	if !check {
+		status = repositories.WITHDRAWCODE422
+		return
+	}
+
+	// Преобразую номер заказа из строки в int64
+	orderNumberInt, err := strconv.ParseInt(orderNumber, 10, 64)
+	if err != nil {
+		err = fmt.Errorf("error of converting string to int64: %w", err)
+		return
+	}
+
+	query := `
+		SELECT
+			id_user
+		FROM orders
+		WHERE number = $1
+	`
+	// проверяю, что заказ с данным номером ещё не был добавлен в систему
+	row := s.conn.QueryRowContext(ctx, query, orderNumberInt)
+	var idFromDB string
+	err = row.Scan(&idFromDB)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			// заказ ещё не был загружен в систему, можно продолжать процесс загрузки
+			err = nil
+		} else {
+			// Ошибка метода Scan
+			return
+		}
+	} else {
+		// заказ уже добавлен в систему
+		status = repositories.WITHDRAWCODE422
+		return
+	}
+	//------------------------------------------------------------------------------------
+
+	// проверяю баланс пользователя--------------------------------------------------------
+
+	balance, err := s.GetBalance(ctx, idUser)
+	if err != nil {
+		return
+	}
+	if balance.Current < sum {
+		// на счету недостаточно средств
+		status = repositories.WITHDRAWCODE402
+		return
+	}
+
+	// вношу изменения в базу данных. Обновляю баланс пользователя и таблицу с информацией о выводе средств
+	// выполняю эти операции внутри одной транзакции
+
+	tx, err := s.conn.BeginTx(ctx, nil)
+	if err != nil {
+		return
+	}
+	// откат транзакции в случае ошибки
+	defer tx.Rollback()
+
+	updateBalance := `
+		UPDATE balance
+		SET current = $1,
+    		withdrawn = $2
+		WHERE id_user = $3;
+	`
+
+	// обновляю баланс пользователя
+	_, err = tx.ExecContext(ctx, updateBalance, balance.Current-sum, balance.Withdrawn+sum)
+
+	// добавляю запись в таблицу с информацией о выводе средств
+	insertWithdrawn := `
+				INSERT INTO withdrawals (number, withdrawn, id_user)
+				VALUES ($1, $2, $3);
+				`
+	_, err = tx.ExecContext(ctx, insertWithdrawn, orderNumberInt, sum, idUser)
+	if err != nil {
+		return
+	}
+
+	// коммитим транзакцию
+	err = tx.Commit()
 	return
 }
