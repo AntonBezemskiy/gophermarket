@@ -1225,7 +1225,6 @@ func TestWithdraw(t *testing.T) {
 		require.NoError(t, err)
 		//-------------------------------------------------------------------------------------------------------------
 
-
 		// Удаление данных из тестовых таблиц для выполнения следующих тестов------------------------------------------
 		err = stor.Disable(ctx)
 		require.NoError(t, err)
@@ -1233,82 +1232,110 @@ func TestWithdraw(t *testing.T) {
 }
 
 func TestWithdrawals(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	{
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
 
-	m := mocks.NewMockWithdrawalsInterface(ctrl)
+		m := mocks.NewMockWithdrawalsInterface(ctrl)
 
-	// тестовый случай с кодом 200--------------------------------------------------------
-	loadT := time.Date(2003, time.May, 1, 17, 1, 21, 0, time.UTC)
-	withdrawals := []repositories.Withdrawals{
-		{
-			Order:     "1234",
-			Sum:       100,
-			ProcessAt: loadT,
-		},
+		// тестовый случай с кодом 200--------------------------------------------------------
+		loadT := time.Date(2003, time.May, 1, 17, 1, 21, 0, time.UTC)
+		withdrawals := []repositories.Withdrawals{
+			{
+				Order:     "1234",
+				Sum:       100,
+				ProcessAt: loadT,
+			},
+		}
+
+		m.EXPECT().GetWithdrawals(gomock.Any(), "id of 200 code").Return(withdrawals, repositories.WITHDRAWALS200, nil)
+
+		// тестовый случай с кодом 204--------------------------------------------------------
+		m.EXPECT().GetWithdrawals(gomock.Any(), "id of 204 code").Return(nil, repositories.WITHDRAWALS204, nil)
+
+		// тестовый случай с кодом 500--------------------------------------------------------
+		m.EXPECT().GetWithdrawals(gomock.Any(), "id of 500 code").Return(nil, 0, fmt.Errorf("error"))
+
+		tests := []struct {
+			name       string
+			id         string
+			wantStatus int
+		}{
+			{
+				name:       "code 200",
+				id:         "id of 200 code",
+				wantStatus: 200,
+			},
+			{
+				name:       "code 204",
+				id:         "id of 204 code",
+				wantStatus: 204,
+			},
+			{
+				name:       "code 500",
+				id:         "id of 500 code",
+				wantStatus: 500,
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				r := chi.NewRouter()
+				r.Get("/api/user/withdrawals", WithdrawalsHandler(m))
+
+				request := httptest.NewRequest(http.MethodGet, "/api/user/withdrawals", nil)
+				w := httptest.NewRecorder()
+
+				// Устанавливаю id пользователя в контекст
+				ctx := context.WithValue(request.Context(), auth.UserIDKey, tt.id)
+
+				r.ServeHTTP(w, request.WithContext(ctx))
+
+				res := w.Result()
+				defer res.Body.Close() // Закрываем тело ответа
+
+				// Проверяю код ответа
+				assert.Equal(t, tt.wantStatus, res.StatusCode)
+
+				// проверяю тело ответа в случае успешного кода запроса
+				if tt.wantStatus == 200 {
+					resJSON := make([]repositories.Withdrawals, 0)
+					body, err := io.ReadAll(res.Body)
+					require.NoError(t, err)
+
+					buRes := bytes.NewBuffer(body)
+					dec := json.NewDecoder(buRes)
+					err = dec.Decode(&resJSON)
+					require.NoError(t, err)
+
+					assert.Equal(t, withdrawals, resJSON)
+				}
+			})
+		}
 	}
+	// тесты с базой данных
+	// предварительно необходимо создать тестовую БД и определить параметры сединения host=host user=user password=password dbname=dbname  sslmode=disable
+	{
+		// инициализация базы данных-------------------------------------------------------------------
+		databaseDsn := "host=localhost user=testgophermart password=newpassword dbname=testgophermart sslmode=disable"
 
-	m.EXPECT().GetWithdrawals(gomock.Any(), "id of 200 code").Return(withdrawals, repositories.WITHDRAWALS200, nil)
+		// создаём соединение с СУБД PostgreSQL
+		conn, err := sql.Open("pgx", databaseDsn)
+		require.NoError(t, err)
+		defer conn.Close()
 
-	// тестовый случай с кодом 204--------------------------------------------------------
-	m.EXPECT().GetWithdrawals(gomock.Any(), "id of 204 code").Return(nil, repositories.WITHDRAWALS204, nil)
+		// Проверка соединения с БД
+		ctx := context.Background()
+		err = conn.PingContext(ctx)
+		require.NoError(t, err)
 
-	// тестовый случай с кодом 500--------------------------------------------------------
-	m.EXPECT().GetWithdrawals(gomock.Any(), "id of 500 code").Return(nil, 0, fmt.Errorf("error"))
+		// создаем экземпляр хранилища pg
+		stor := pg.NewStore(conn)
+		err = stor.Bootstrap(ctx)
+		require.NoError(t, err)
+		//-------------------------------------------------------------------------------------------------------------
 
-	tests := []struct {
-		name       string
-		id         string
-		wantStatus int
-	}{
-		{
-			name:       "code 200",
-			id:         "id of 200 code",
-			wantStatus: 200,
-		},
-		{
-			name:       "code 204",
-			id:         "id of 204 code",
-			wantStatus: 204,
-		},
-		{
-			name:       "code 500",
-			id:         "id of 500 code",
-			wantStatus: 500,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			r := chi.NewRouter()
-			r.Get("/api/user/withdrawals", WithdrawalsHandler(m))
-
-			request := httptest.NewRequest(http.MethodGet, "/api/user/withdrawals", nil)
-			w := httptest.NewRecorder()
-
-			// Устанавливаю id пользователя в контекст
-			ctx := context.WithValue(request.Context(), auth.UserIDKey, tt.id)
-
-			r.ServeHTTP(w, request.WithContext(ctx))
-
-			res := w.Result()
-			defer res.Body.Close() // Закрываем тело ответа
-
-			// Проверяю код ответа
-			assert.Equal(t, tt.wantStatus, res.StatusCode)
-
-			// проверяю тело ответа в случае успешного кода запроса
-			if tt.wantStatus == 200 {
-				resJSON := make([]repositories.Withdrawals, 0)
-				body, err := io.ReadAll(res.Body)
-				require.NoError(t, err)
-
-				buRes := bytes.NewBuffer(body)
-				dec := json.NewDecoder(buRes)
-				err = dec.Decode(&resJSON)
-				require.NoError(t, err)
-
-				assert.Equal(t, withdrawals, resJSON)
-			}
-		})
+		// Удаление данных из тестовых таблиц для выполнения следующих тестов------------------------------------------
+		err = stor.Disable(ctx)
+		require.NoError(t, err)
 	}
 }

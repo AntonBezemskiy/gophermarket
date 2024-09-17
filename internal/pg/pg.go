@@ -463,3 +463,52 @@ func (s Store) Withdraw(ctx context.Context, idUser string, orderNumber string, 
 	err = tx.Commit()
 	return
 }
+
+func (s Store) GetWithdrawals(ctx context.Context, idUser string) (withdrawals []repositories.Withdrawals, status int, err error) {
+	withdrawals = make([]repositories.Withdrawals, 0)
+
+	// получаю записи о выводе средств для данного пользователя
+	query := `
+		SELECT
+			number,
+			withdrawn,
+			processed_at
+		FROM withdrawals
+		WHERE id_user = $1
+		ORDER BY processed_at DESC
+	`
+	rows, errQuery := s.conn.QueryContext(ctx, query, idUser)
+	if errQuery != nil {
+		err = errQuery
+		return
+	}
+	// обязательно закрываем перед возвратом функции
+	defer rows.Close()
+
+	withdrawnExist := false
+	// собираю заказы для ответа сервера
+	for rows.Next() {
+		// флаг, что есть как минимум одно списание средств
+		withdrawnExist = true
+
+		var w repositories.Withdrawals
+		err = rows.Scan(&w.Order, &w.Sum, &w.ProcessAt)
+		if err != nil {
+			return
+		}
+		withdrawals = append(withdrawals, w)
+	}
+	// проверяю, есть ли у данного пользователя списания
+	if !withdrawnExist {
+		// нет ни одного списания
+		status = repositories.WITHDRAWALS204
+		return
+	}
+	// проверяю на ошибки
+	err = rows.Err()
+	if err != nil {
+		return
+	}
+	status = repositories.WITHDRAWALS200
+	return
+}
