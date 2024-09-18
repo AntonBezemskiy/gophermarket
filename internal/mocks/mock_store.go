@@ -106,6 +106,21 @@ func (mr *MockOrdersInterfaceMockRecorder) GetOrders(arg0, arg1 interface{}) *go
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOrders", reflect.TypeOf((*MockOrdersInterface)(nil).GetOrders), arg0, arg1)
 }
 
+// GetOrdersForAccrual mocks base method.
+func (m *MockOrdersInterface) GetOrdersForAccrual(arg0 context.Context) ([]int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetOrdersForAccrual", arg0)
+	ret0, _ := ret[0].([]int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetOrdersForAccrual indicates an expected call of GetOrdersForAccrual.
+func (mr *MockOrdersInterfaceMockRecorder) GetOrdersForAccrual(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOrdersForAccrual", reflect.TypeOf((*MockOrdersInterface)(nil).GetOrdersForAccrual), arg0)
+}
+
 // Load mocks base method.
 func (m *MockOrdersInterface) Load(arg0 context.Context, arg1, arg2 string) (int, error) {
 	m.ctrl.T.Helper()

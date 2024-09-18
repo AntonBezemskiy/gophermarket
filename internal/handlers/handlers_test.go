@@ -1099,50 +1099,50 @@ func TestWithdraw(t *testing.T) {
 		// тестовый случай с кодом 200--------------------------------------------------------
 		withdraw200 := repositories.WithdrawRequest{
 			Order: "1234",
-			Sum:   100,
+			Sum:   100.0,
 		}
 		var body200 bytes.Buffer
 		enc := json.NewEncoder(&body200)
 		err := enc.Encode(withdraw200)
 		require.NoError(t, err)
 
-		m.EXPECT().Withdraw(gomock.Any(), "id of 200 code", "1234", 100).Return(repositories.WITHDRAWCODE200, nil)
+		m.EXPECT().Withdraw(gomock.Any(), "id of 200 code", "1234", 100.0).Return(repositories.WITHDRAWCODE200, nil)
 
 		// тестовый случай с кодом 402--------------------------------------------------------
 		withdraw402 := repositories.WithdrawRequest{
 			Order: "1234",
-			Sum:   2000,
+			Sum:   2000.0,
 		}
 		var body402 bytes.Buffer
 		enc402 := json.NewEncoder(&body402)
 		err = enc402.Encode(withdraw402)
 		require.NoError(t, err)
 
-		m.EXPECT().Withdraw(gomock.Any(), "id of 402 code", "1234", 2000).Return(repositories.WITHDRAWCODE402, nil)
+		m.EXPECT().Withdraw(gomock.Any(), "id of 402 code", "1234", 2000.0).Return(repositories.WITHDRAWCODE402, nil)
 
 		// тестовый случай с кодом 422--------------------------------------------------------
 		withdraw422 := repositories.WithdrawRequest{
 			Order: "wrrong number of order",
-			Sum:   2000,
+			Sum:   2000.0,
 		}
 		var body422 bytes.Buffer
 		enc422 := json.NewEncoder(&body422)
 		err = enc422.Encode(withdraw422)
 		require.NoError(t, err)
 
-		m.EXPECT().Withdraw(gomock.Any(), "id of 422 code", "wrrong number of order", 2000).Return(repositories.WITHDRAWCODE422, nil)
+		m.EXPECT().Withdraw(gomock.Any(), "id of 422 code", "wrrong number of order", 2000.0).Return(repositories.WITHDRAWCODE422, nil)
 
 		// тестовый случай с кодом 500--------------------------------------------------------
 		withdraw500 := repositories.WithdrawRequest{
 			Order: "12345",
-			Sum:   2000,
+			Sum:   2000.0,
 		}
 		var body500 bytes.Buffer
 		enc500 := json.NewEncoder(&body500)
 		err = enc500.Encode(withdraw500)
 		require.NoError(t, err)
 
-		m.EXPECT().Withdraw(gomock.Any(), "id of 500 code", "12345", 2000).Return(0, fmt.Errorf("error"))
+		m.EXPECT().Withdraw(gomock.Any(), "id of 500 code", "12345", 2000.0).Return(0, fmt.Errorf("error"))
 
 		tests := []struct {
 			name       string
@@ -1243,7 +1243,7 @@ func TestWithdrawals(t *testing.T) {
 		withdrawals := []repositories.Withdrawals{
 			{
 				Order:     "1234",
-				Sum:       100,
+				Sum:       100.0,
 				ProcessAt: loadT,
 			},
 		}

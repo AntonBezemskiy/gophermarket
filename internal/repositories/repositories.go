@@ -47,13 +47,14 @@ const (
 type Order struct {
 	Number     int64     `json:"number"`      // номер заказа
 	Status     string    `json:"status"`      // стату обработки заказа
-	Accrual    float64       `json:"accrual"`     // сумма начисленных бонусов за заказ
+	Accrual    float64   `json:"accrual"`     // сумма начисленных бонусов за заказ
 	UploadedAt time.Time `json:"uploaded_at"` // время загрузки заказа
 }
 
 type OrdersInterface interface {
-	Load(ctx context.Context, idUser string, orderNumber string) (status int, err error) // load order in storage. Gets context, id of user, order number of user. Returns different status codes and posible error
-	GetOrders(ctx context.Context, idUser string) (orders []Order, status int, err error)      // get list of orders. List is sortied by data of loading. Gets context, id of user. Returns list, status and error
+	Load(ctx context.Context, idUser string, orderNumber string) (status int, err error)  // load order in storage. Gets context, id of user, order number of user. Returns different status codes and posible error
+	GetOrders(ctx context.Context, idUser string) (orders []Order, status int, err error) // get list of orders. List is sortied by data of loading. Gets context, id of user. Returns list, status and error
+	GetOrdersForAccrual(ctx context.Context) (numbers []int64, err error)                 // return numbers of all orders with NEW and PROCESSING status
 }
 
 //--------------------------------------------------------------------------------------------------------------------
@@ -76,8 +77,8 @@ const (
 )
 
 type WithdrawRequest struct {
-	Order string `json:"order"` // номер заказа
-	Sum   float64    `json:"sum"`   // сумма баллов к списанию в счёт оплаты
+	Order string  `json:"order"` // номер заказа
+	Sum   float64 `json:"sum"`   // сумма баллов к списанию в счёт оплаты
 }
 
 type WithdrawInterface interface {
@@ -92,10 +93,17 @@ const (
 
 type Withdrawals struct {
 	Order     string    `json:"order"`        // номер заказа
-	Sum       float64       `json:"sum"`          // вывод средств
+	Sum       float64   `json:"sum"`          // вывод средств
 	ProcessAt time.Time `json:"processed_at"` // дата вывода средств
 }
 
 type WithdrawalsInterface interface {
 	GetWithdrawals(ctx context.Context, idUser string) (withdrawals []Withdrawals, status int, err error) // get information about withdrawals. Gets context, id of user. Return list of withdrawals, status and error
+}
+
+// ------------------------------------------------------------------------------------------------------
+
+type RetryInterface interface {
+	AddRetryPeriod(ctx context.Context, service string, period time.Time) error // set period time of waiting for requesting to particular service
+	GetRetryPeriod(ctx context.Context, service string) (time.Time, error)      // get period time of waiting for requesting to particular service
 }

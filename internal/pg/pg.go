@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/AntonBezemskiy/gophermart/internal/auth"
 	"github.com/AntonBezemskiy/gophermart/internal/repositories"
@@ -99,12 +100,21 @@ func (s Store) Bootstrap(ctx context.Context) (err error) {
 		return err
 	}
 
+	// создаю таблицу для хранения информации периоде времени в секундах, в течении которого сервис не должен отправлять запросы к accrual
+	_, err = tx.ExecContext(ctx, `
+		CREATE TABLE IF NOT EXISTS wait (
+			service varchar(128) PRIMARY KEY,
+			period TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		)
+	`)
+
 	// коммитим транзакцию
 	err = tx.Commit()
 	return err
 }
 
-// Bootstrap останавливает работу БД, удаляя таблицы и индексы
+// Disable очищает БД, удаляя записи из таблиц
+// необходима для тестирования, чтобы в процессе удалять тестовые записи
 func (s Store) Disable(ctx context.Context) (err error) {
 	// запускаем транзакцию
 	tx, err := s.conn.BeginTx(ctx, nil)
@@ -123,6 +133,14 @@ func (s Store) Disable(ctx context.Context) (err error) {
 		return err
 	}
 
+	// удаляю все записи в таблице orders
+	_, err = tx.ExecContext(ctx, `
+			TRUNCATE TABLE orders 
+	`)
+	if err != nil {
+		return err
+	}
+
 	// удаляю все записи в таблице balance
 	_, err = tx.ExecContext(ctx, `
 			TRUNCATE TABLE balance 
@@ -134,6 +152,14 @@ func (s Store) Disable(ctx context.Context) (err error) {
 	// удаляю все записи в таблице withdrawals
 	_, err = tx.ExecContext(ctx, `
 			TRUNCATE TABLE withdrawals 
+	`)
+	if err != nil {
+		return err
+	}
+
+	// удаляю все записи в таблице wait
+	_, err = tx.ExecContext(ctx, `
+			TRUNCATE TABLE wait
 	`)
 	if err != nil {
 		return err
@@ -357,6 +383,42 @@ func (s Store) GetOrders(ctx context.Context, idUser string) (orders []repositor
 	return
 }
 
+// выгружаю номера заказов для которых необходимо получить баллы лояльности
+func (s Store) GetOrdersForAccrual(ctx context.Context) (numbers []int64, err error) {
+
+	// выгружаю все заказы со статусами NEW и PROCESSING. Сортировка по времени от самых старых к самым новым заказам
+	query := `
+		SELECT
+			number
+		FROM orders
+		WHERE status = $1 OR status = $2
+		ORDER BY uploaded_at
+	`
+	rows, errQuery := s.conn.QueryContext(ctx, query, repositories.NEW, repositories.PROCESSING)
+	if errQuery != nil {
+		err = errQuery
+		return
+	}
+	// обязательно закрываем перед возвратом функции
+	defer rows.Close()
+
+	// собираю номера заказов
+	for rows.Next() {
+		var number int64
+		err = rows.Scan(&number)
+		if err != nil {
+			return
+		}
+		numbers = append(numbers, number)
+	}
+	// проверяю на ошибки
+	err = rows.Err()
+	if err != nil {
+		return
+	}
+	return
+}
+
 func (s Store) GetBalance(ctx context.Context, idUser string) (balance repositories.Balance, err error) {
 	query := `
 		SELECT
@@ -511,4 +573,38 @@ func (s Store) GetWithdrawals(ctx context.Context, idUser string) (withdrawals [
 	}
 	status = repositories.WITHDRAWALS200
 	return
+}
+
+// устанавливаю период ожидания для определенного сервиса
+func (s Store) AddRetryPeriod(ctx context.Context, service string, period time.Time) error {
+	// добавляю запись в таблицу с информацией о выводе средств
+	insertPeriod := `
+				INSERT INTO wait (service, period)
+				VALUES ($1, $2)
+				ON CONFLICT (service)
+				DO UPDATE SET period = EXCLUDED.period;
+				`
+	_, err := s.conn.ExecContext(ctx, insertPeriod, service, period)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// получаю период ожидания для определенного сервиса
+func (s Store) GetRetryPeriod(ctx context.Context, service string) (time.Time, error) {
+	query := `
+		SELECT
+			period
+		FROM wait
+		WHERE service = $1
+	`
+
+	row := s.conn.QueryRowContext(ctx, query, service)
+	var period time.Time
+	err := row.Scan(&period)
+	if err != nil {
+		return time.Now(), err
+	}
+	return period, nil
 }

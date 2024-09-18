@@ -3,13 +3,15 @@ package main
 import (
 	"flag"
 	"os"
+
+	"github.com/AntonBezemskiy/gophermart/internal/accrual"
 )
 
 var (
-	netAddr      string
-	logLevel string
-	databaseDsn     string
-	accrualSystemAddress  string
+	netAddr     string
+	logLevel    string
+	databaseDsn string
+	//accrualSystemAddress  string
 )
 
 // конфигурирование приложения с приоритетом у значений флагов
@@ -18,7 +20,7 @@ func parseFlags() {
 	flag.StringVar(&flagNetAddr, "a", "", "address and port to run server")
 
 	// настройка флага для хранения метрик в базе данных
-	var flagDatabaseDsn     string
+	var flagDatabaseDsn string
 	flag.StringVar(&flagDatabaseDsn, "d", "", "database connection address") // host=localhost user=metrics password=metrics dbname=metricsdb  sslmode=disable
 
 	// настройка адреса системы расчёта начислений через флаг
@@ -30,40 +32,45 @@ func parseFlags() {
 
 	flag.Parse()
 
-	// устанавливаю значения равными соответствующим переменным окружения, в случае если не задан флаг и если существует 
+	// устанавливаю значения равными соответствующим переменным окружения, в случае если не задан флаг и если существует
 	// переменная окружения с непустым значением
 	if flagNetAddr == "" {
 		if envRunAddr := os.Getenv("RUN_ADDRESS"); envRunAddr != "" {
 			flagNetAddr = envRunAddr
 		}
 	}
-	if flagDatabaseDsn == ""{
+	if flagDatabaseDsn == "" {
 		if envDatabaseDsn := os.Getenv("DATABASE_URI"); envDatabaseDsn != "" {
 			flagDatabaseDsn = envDatabaseDsn
 		}
 	}
-	if flagAccrualSystemAddress == ""{
+	if flagAccrualSystemAddress == "" {
 		if envAccrualSystemAddress := os.Getenv("DATABASE_URI"); envAccrualSystemAddress != "" {
-			flagDatabaseDsn = envAccrualSystemAddress
+			flagAccrualSystemAddress = envAccrualSystemAddress
 		}
 	}
-	if flagLogLevel == ""{
+	if flagLogLevel == "" {
 		if envLogLevel := os.Getenv("DATABASE_URI"); envLogLevel != "" {
 			flagLogLevel = envLogLevel
 		}
 	}
 
 	// устанавливаю значения по умолчанию, если значения не были заданы ни флагом, ни переменной окружения
-	if flagNetAddr == ""{
-		netAddr = ":8080"
+	if flagNetAddr == "" {
+		flagNetAddr = ":8080"
 	}
-	if flagDatabaseDsn == ""{
+	if flagDatabaseDsn == "" {
 		databaseDsn = ""
 	}
-	if flagAccrualSystemAddress == ""{
-		accrualSystemAddress = ""
+	if flagAccrualSystemAddress == "" {
+		flagAccrualSystemAddress = ""
 	}
-	if flagLogLevel == ""{
+	if flagLogLevel == "" {
 		logLevel = ""
 	}
+
+	// устанавливаю глобальные переменные полученными значениями
+	netAddr = flagNetAddr
+	databaseDsn = flagDatabaseDsn
+	accrual.SetAccrualSystemAddress(flagAccrualSystemAddress)
 }

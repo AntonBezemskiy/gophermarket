@@ -24,11 +24,13 @@ func main() {
 	}
 	defer db.Close()
 
+	// инициализация базы данных-----------------------------------------------------
 	// создаём соединение с СУБД PostgreSQL с помощью аргумента командной строки
 	conn, err := sql.Open("pgx", databaseDsn)
 	if err != nil {
 		log.Fatalf("Error create database connection for saving metrics : %v\n", err)
 	}
+
 	// Проверка соединения с БД
 	ctx := context.Background()
 	err = db.PingContext(ctx)
@@ -41,6 +43,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error prepare database to work: %v\n", err)
 	}
+	// ------------------------------------------------------------------------------
 
 	if err := run(); err != nil {
 		log.Fatalf("Error starting server: %v\n", err)
