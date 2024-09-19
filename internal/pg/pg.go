@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/AntonBezemskiy/gophermart/internal/accrual"
 	"github.com/AntonBezemskiy/gophermart/internal/auth"
 	"github.com/AntonBezemskiy/gophermart/internal/repositories"
 	"github.com/AntonBezemskiy/gophermart/internal/tools"
@@ -288,7 +287,9 @@ func (s Store) Load(ctx context.Context, idUser string, orderNumber string) (sta
 	// Преобразую номер заказа из строки в int64
 	orderNumberInt, err := strconv.ParseInt(orderNumber, 10, 64)
 	if err != nil {
-		err = fmt.Errorf("error of converting string to int64: %w", err)
+		// переданный параметр не является числом, возвращаю соответствующий статус
+		err = nil
+		status = repositories.WITHDRAWCODE422
 		return
 	}
 
@@ -495,7 +496,7 @@ func (s Store) UpdateOrder(ctx context.Context, orderNumber string, status strin
 }
 
 // обновляю инофрмацию в заказах транзакцией
-func (s Store) UpdateOrderTX(ctx context.Context, dataSlice []accrual.AccrualData) error {
+func (s Store) UpdateOrderTX(ctx context.Context, dataSlice []repositories.AccrualData) error {
 	tx, err := s.conn.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -593,7 +594,7 @@ func (s Store) GetBalance(ctx context.Context, idUser string) (balance repositor
 	return
 }
 
-// Запрос на списание средств
+// Запрос на списание средств. Так же в методе обновляется информация о выводе средств
 func (s Store) Withdraw(ctx context.Context, idUser string, orderNumber string, sum float64) (status int, err error) {
 	// Проверяю кооректность номера заказа. Номер заказа некорректный в случае если он не проходит проверку по алгоритму Луна
 	// или если такой заказ уже существует в сервисе
@@ -606,7 +607,9 @@ func (s Store) Withdraw(ctx context.Context, idUser string, orderNumber string, 
 	// Преобразую номер заказа из строки в int64
 	orderNumberInt, err := strconv.ParseInt(orderNumber, 10, 64)
 	if err != nil {
-		err = fmt.Errorf("error of converting string to int64: %w", err)
+		// переданный параметр не является числом, возвращаю соответствующий статус
+		err = nil
+		status = repositories.WITHDRAWCODE422
 		return
 	}
 
@@ -659,13 +662,13 @@ func (s Store) Withdraw(ctx context.Context, idUser string, orderNumber string, 
 
 	updateBalance := `
 		UPDATE balance
-		SET current = $1,
-    		withdrawn = $2
+		SET current = current - $1,
+    		withdrawn = withdrawn + $2
 		WHERE id_user = $3;
 	`
 
 	// обновляю баланс пользователя
-	_, err = tx.ExecContext(ctx, updateBalance, balance.Current-sum, balance.Withdrawn+sum)
+	_, err = tx.ExecContext(ctx, updateBalance, sum, sum, idUser)
 
 	// добавляю запись в таблицу с информацией о выводе средств
 	insertWithdrawn := `
@@ -676,6 +679,9 @@ func (s Store) Withdraw(ctx context.Context, idUser string, orderNumber string, 
 	if err != nil {
 		return
 	}
+
+	// Устанавливаю статус успешной обработки запроса
+	status = repositories.WITHDRAWCODE200
 
 	// коммитим транзакцию
 	err = tx.Commit()

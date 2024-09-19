@@ -42,22 +42,16 @@ const (
 	PROCESSED  = "PROCESSED"
 )
 
-type AccrualData struct {
-	Order   string `json:"order"`   // номер заказа
-	Status  string `json:"status"`  // статус обработки заказа
-	Accrual float64  `json:"accrual"` // статус расчёта начисления
-}
-
 type Retry struct {
 	retryPeriod int    // период,в течении которого сервис не должен отправлять запросы к accrual
 	message     string // сообщение от accrual
 }
 
 type Result struct {
-	AccrualData         // данные полученные от accrual
-	Retry               // данные полученные от accrual из-за превышения лимита запросов
-	err           error // сохраняю внутреннюю ошибку gophermart
-	requestStatus int   // код ответа от accrual
+	repositories.AccrualData       // данные полученные от accrual
+	Retry                          // данные полученные от accrual из-за превышения лимита запросов
+	err                      error // сохраняю внутреннюю ошибку gophermart
+	requestStatus            int   // код ответа от accrual
 }
 
 func Sender(jobs <-chan int64, results chan<- Result, client *resty.Client) {
@@ -73,7 +67,6 @@ func Sender(jobs <-chan int64, results chan<- Result, client *resty.Client) {
 			Get(url)
 
 		if err != nil {
-			//logger.ServerLog.Error("send request to accrual error", zap.String("address", url), zap.String("error", err.Error()))
 			responce.err = fmt.Errorf("send request to accrual error %w", err)
 		}
 
@@ -83,11 +76,10 @@ func Sender(jobs <-chan int64, results chan<- Result, client *resty.Client) {
 			responceAccrual := resp.Body()
 
 			// Десериализую данные полученные от сервиса accrual
-			var res AccrualData
+			var res repositories.AccrualData
 			buRes := bytes.NewBuffer(responceAccrual)
 			dec := json.NewDecoder(buRes)
 			if err := dec.Decode(&res); err != nil {
-				//logger.ServerLog.Error("decode data from accrual error", zap.String("error", err.Error()))
 				responce.err = fmt.Errorf("decode data from accrual error %w", err)
 			}
 			responce.AccrualData = res
@@ -164,6 +156,8 @@ func UpdateAccrualData(ctx context.Context, stor repositories.OrdersInterface, r
 		results, err := Generator(ctx, stor)
 		logger.ServerLog.Error("get error in UpdateAccrualData", zap.String("error", err.Error()))
 
+		accrualData := make([]repositories.AccrualData, 0)
+
 		for _, result := range results {
 			if result.err != nil {
 				logger.ServerLog.Error("internal error", zap.String("error", result.err.Error()))
@@ -184,9 +178,14 @@ func UpdateAccrualData(ctx context.Context, stor repositories.OrdersInterface, r
 			}
 			// обработка кода 200 от accrual
 			if result.requestStatus == http.StatusNoContent {
-
+				// накапливаю данные для обновления заказов в рамках единой транзакции
+				accrualData = append(accrualData, repositories.AccrualData{Order: result.Order, Status: result.Status, Accrual: result.Accrual})
 			}
 		}
+		// обновляю информацию в заказах
+		err = stor.UpdateOrderTX(ctx, accrualData)
+		logger.ServerLog.Error("get error in UpdateOrderTX", zap.String("error", err.Error()))
+
 		// ожидание между итерациями отправки запросов к accrual
 		time.Sleep(GetRequestPeriod() * time.Second)
 	}

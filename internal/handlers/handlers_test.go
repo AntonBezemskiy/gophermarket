@@ -1203,32 +1203,6 @@ func TestWithdraw(t *testing.T) {
 			})
 		}
 	}
-	// тесты с базой данных
-	// предварительно необходимо создать тестовую БД и определить параметры сединения host=host user=user password=password dbname=dbname  sslmode=disable
-	{
-		// инициализация базы данных-------------------------------------------------------------------
-		databaseDsn := "host=localhost user=testgophermart password=newpassword dbname=testgophermart sslmode=disable"
-
-		// создаём соединение с СУБД PostgreSQL
-		conn, err := sql.Open("pgx", databaseDsn)
-		require.NoError(t, err)
-		defer conn.Close()
-
-		// Проверка соединения с БД
-		ctx := context.Background()
-		err = conn.PingContext(ctx)
-		require.NoError(t, err)
-
-		// создаем экземпляр хранилища pg
-		stor := pg.NewStore(conn)
-		err = stor.Bootstrap(ctx)
-		require.NoError(t, err)
-		//-------------------------------------------------------------------------------------------------------------
-
-		// Удаление данных из тестовых таблиц для выполнения следующих тестов------------------------------------------
-		err = stor.Disable(ctx)
-		require.NoError(t, err)
-	}
 }
 
 func TestWithdrawals(t *testing.T) {
@@ -1311,31 +1285,5 @@ func TestWithdrawals(t *testing.T) {
 				}
 			})
 		}
-	}
-	// тесты с базой данных
-	// предварительно необходимо создать тестовую БД и определить параметры сединения host=host user=user password=password dbname=dbname  sslmode=disable
-	{
-		// инициализация базы данных-------------------------------------------------------------------
-		databaseDsn := "host=localhost user=testgophermart password=newpassword dbname=testgophermart sslmode=disable"
-
-		// создаём соединение с СУБД PostgreSQL
-		conn, err := sql.Open("pgx", databaseDsn)
-		require.NoError(t, err)
-		defer conn.Close()
-
-		// Проверка соединения с БД
-		ctx := context.Background()
-		err = conn.PingContext(ctx)
-		require.NoError(t, err)
-
-		// создаем экземпляр хранилища pg
-		stor := pg.NewStore(conn)
-		err = stor.Bootstrap(ctx)
-		require.NoError(t, err)
-		//-------------------------------------------------------------------------------------------------------------
-
-		// Удаление данных из тестовых таблиц для выполнения следующих тестов------------------------------------------
-		err = stor.Disable(ctx)
-		require.NoError(t, err)
 	}
 }

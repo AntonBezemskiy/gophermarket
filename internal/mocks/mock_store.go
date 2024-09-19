@@ -136,6 +136,34 @@ func (mr *MockOrdersInterfaceMockRecorder) Load(arg0, arg1, arg2 interface{}) *g
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Load", reflect.TypeOf((*MockOrdersInterface)(nil).Load), arg0, arg1, arg2)
 }
 
+// UpdateOrder mocks base method.
+func (m *MockOrdersInterface) UpdateOrder(arg0 context.Context, arg1, arg2 string, arg3 float64) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateOrder", arg0, arg1, arg2, arg3)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateOrder indicates an expected call of UpdateOrder.
+func (mr *MockOrdersInterfaceMockRecorder) UpdateOrder(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateOrder", reflect.TypeOf((*MockOrdersInterface)(nil).UpdateOrder), arg0, arg1, arg2, arg3)
+}
+
+// UpdateOrderTX mocks base method.
+func (m *MockOrdersInterface) UpdateOrderTX(arg0 context.Context, arg1 []repositories.AccrualData) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateOrderTX", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateOrderTX indicates an expected call of UpdateOrderTX.
+func (mr *MockOrdersInterfaceMockRecorder) UpdateOrderTX(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateOrderTX", reflect.TypeOf((*MockOrdersInterface)(nil).UpdateOrderTX), arg0, arg1)
+}
+
 // MockBalanceInterface is a mock of BalanceInterface interface.
 type MockBalanceInterface struct {
 	ctrl     *gomock.Controller

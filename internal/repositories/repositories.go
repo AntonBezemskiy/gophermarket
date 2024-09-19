@@ -51,10 +51,18 @@ type Order struct {
 	UploadedAt time.Time `json:"uploaded_at"` // время загрузки заказа
 }
 
+type AccrualData struct {
+	Order   string  `json:"order"`   // номер заказа
+	Status  string  `json:"status"`  // статус обработки заказа
+	Accrual float64 `json:"accrual"` // статус расчёта начисления
+}
+
 type OrdersInterface interface {
-	Load(ctx context.Context, idUser string, orderNumber string) (status int, err error)  // load order in storage. Gets context, id of user, order number of user. Returns different status codes and posible error
-	GetOrders(ctx context.Context, idUser string) (orders []Order, status int, err error) // get list of orders. List is sortied by data of loading. Gets context, id of user. Returns list, status and error
-	GetOrdersForAccrual(ctx context.Context) (numbers []int64, err error)                 // return numbers of all orders with NEW and PROCESSING status
+	Load(ctx context.Context, idUser string, orderNumber string) (status int, err error)       // load order in storage. Gets context, id of user, order number of user. Returns different status codes and posible error
+	GetOrders(ctx context.Context, idUser string) (orders []Order, status int, err error)      // get list of orders. List is sortied by data of loading. Gets context, id of user. Returns list, status and error
+	GetOrdersForAccrual(ctx context.Context) (numbers []int64, err error)                      // return numbers of all orders with NEW and PROCESSING status
+	UpdateOrder(ctx context.Context, orderNumber string, status string, accrual float64) error // update order info
+	UpdateOrderTX(ctx context.Context, dataSlice []AccrualData) error                          // update orders info in one transaction
 }
 
 //--------------------------------------------------------------------------------------------------------------------
