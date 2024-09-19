@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/AntonBezemskiy/gophermart/internal/logger"
 	"github.com/AntonBezemskiy/gophermart/internal/repositories"
@@ -24,6 +25,16 @@ func GetAccrualSystemAddress() string {
 	return accrualSystemAddress
 }
 
+var requestPeriod time.Duration // период между итерациями отправки запросов к accrual
+
+func SetRequestPeriod(period time.Duration) {
+	requestPeriod = period
+}
+
+func GetRequestPeriod() time.Duration {
+	return requestPeriod
+}
+
 const (
 	REGISTERED = "REGISTERED"
 	INVALID    = "INVALID"
@@ -34,14 +45,19 @@ const (
 type AccrualData struct {
 	Order   string `json:"order"`   // номер заказа
 	Status  string `json:"status"`  // статус обработки заказа
-	Accrual int64  `json:"accrual"` // статус расчёта начисления
+	Accrual float64  `json:"accrual"` // статус расчёта начисления
+}
+
+type Retry struct {
+	retryPeriod int    // период,в течении которого сервис не должен отправлять запросы к accrual
+	message     string // сообщение от accrual
 }
 
 type Result struct {
-	err           error // сохраняю внутреннюю ошибку gophermart
 	AccrualData         // данные полученные от accrual
+	Retry               // данные полученные от accrual из-за превышения лимита запросов
+	err           error // сохраняю внутреннюю ошибку gophermart
 	requestStatus int   // код ответа от accrual
-	retryPeriod   int   // период,в течении которого сервис не должен отправлять запросы к accrual
 }
 
 func Sender(jobs <-chan int64, results chan<- Result, client *resty.Client) {
@@ -128,8 +144,23 @@ func Generator(ctx context.Context, stor repositories.OrdersInterface) ([]Result
 	return dataFromAccrual, nil
 }
 
-func UpdateAccrualData(ctx context.Context, stor repositories.OrdersInterface) {
+func waitUntil(date time.Time) {
+	duration := time.Until(date) // вычисляем время до указанной даты
+	if duration > 0 {
+		time.Sleep(duration) // ждем до указанного времени
+	}
+}
+
+func UpdateAccrualData(ctx context.Context, stor repositories.OrdersInterface, retry repositories.RetryInterface) {
 	for {
+		// Устанавливаю ожидание, если был превышен лимит обращений к accrual
+		waitPeriod, err := retry.GetRetryPeriod(ctx, "accrual")
+		if err != nil {
+			logger.ServerLog.Error("internal error in GetRetryPeriod", zap.String("error", err.Error()))
+		} else {
+			waitUntil(waitPeriod)
+		}
+
 		results, err := Generator(ctx, stor)
 		logger.ServerLog.Error("get error in UpdateAccrualData", zap.String("error", err.Error()))
 
@@ -143,8 +174,20 @@ func UpdateAccrualData(ctx context.Context, stor repositories.OrdersInterface) {
 			}
 			// обработка кода 429 от accrual: превышено количество запросов к сервису.
 			if result.requestStatus == http.StatusTooManyRequests {
-				logger.ServerLog.Error("reached limit to request to accrual", zap.String("status", "429"))
+				logger.ServerLog.Error(result.message, zap.String("status", "429"))
+
+				// фиксирую дату и время в UTC, до которого нельзя обращаться к сервису accrual
+				// в UTC, потому база данных преобразует время к UTC
+				period := time.Now().Add(time.Duration(result.retryPeriod) * time.Second).UTC()
+				err := retry.AddRetryPeriod(ctx, "accrual", period)
+				logger.ServerLog.Error("internal error", zap.String("error", err.Error()))
+			}
+			// обработка кода 200 от accrual
+			if result.requestStatus == http.StatusNoContent {
+
 			}
 		}
+		// ожидание между итерациями отправки запросов к accrual
+		time.Sleep(GetRequestPeriod() * time.Second)
 	}
 }

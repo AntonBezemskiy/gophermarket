@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/AntonBezemskiy/gophermart/internal/accrual"
 	"github.com/AntonBezemskiy/gophermart/internal/auth"
 	"github.com/AntonBezemskiy/gophermart/internal/repositories"
 	"github.com/AntonBezemskiy/gophermart/internal/tools"
@@ -381,6 +382,161 @@ func (s Store) GetOrders(ctx context.Context, idUser string) (orders []repositor
 	}
 	status = repositories.GETORDERSCODE200
 	return
+}
+
+// Метод для получения id пользователя, который загрузил данный заказ
+func (s Store) GetIdByOrderNumber(ctx context.Context, orderNumber string) (string, error) {
+	// Преобразую номер заказа из строки в int64
+	orderNumberInt, err := strconv.ParseInt(orderNumber, 10, 64)
+	if err != nil {
+		return "", fmt.Errorf("error of converting string to int64: %w", err)
+	}
+
+	query := `
+		SELECT
+			id_user
+		FROM orders
+		WHERE number = $1
+	`
+	// получаю id пользователя по номеру заказа, чтобы обновить баланс именно того пользователя, который загрузил заказа
+	row := s.conn.QueryRowContext(ctx, query, orderNumberInt)
+	var idFromDB string
+	err = row.Scan(&idFromDB)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			// заказ ещё не был загружен в систему, такая ситуация является внутренней ошибкой сервиса
+			return "", fmt.Errorf("internal error: order is not loaded in gophermart %w", err)
+		} else {
+			// Ошибка метода Scan
+			return "", err
+		}
+	}
+	return idFromDB, nil
+}
+
+// Обновляет баланс пользователя по номеру заказа и сумме начисленных баллов
+func (s Store) UpdateBalance(ctx context.Context, orderNumber string, accrual float64) error {
+	// Преобразую номер заказа из строки в int64
+	orderNumberInt, err := strconv.ParseInt(orderNumber, 10, 64)
+	if err != nil {
+		return fmt.Errorf("error of converting string to int64: %w", err)
+	}
+
+	query := `
+		SELECT
+			id_user
+		FROM orders
+		WHERE number = $1
+	`
+	// получаю id пользователя по номеру заказа, чтобы обновить баланс именно того пользователя, который загрузил заказа
+	row := s.conn.QueryRowContext(ctx, query, orderNumberInt)
+	var idFromDB string
+	err = row.Scan(&idFromDB)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			// заказ ещё не был загружен в систему, такая ситуация является внутренней ошибкой сервиса
+			return fmt.Errorf("internal error: order is not loaded in gophermart %w", err)
+		} else {
+			// Ошибка метода Scan
+			return err
+		}
+	}
+
+	updateBalance := `
+				UPDATE balance
+				SET current = current + $1
+				WHERE id_user = $2;
+		`
+	_, err = s.conn.ExecContext(ctx, updateBalance, accrual, idFromDB)
+
+	return err
+}
+
+// обновляю инофрмацию в заказах. Так же в случае начисления баллов обновляю баланс пользователя
+func (s Store) UpdateOrder(ctx context.Context, orderNumber string, status string, accrual float64) error {
+	tx, err := s.conn.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	// откат транзакции в случае ошибки
+	defer tx.Rollback()
+
+	updateOrder := `
+				UPDATE orders
+				SET status = $1,
+    				accrual = accrual + $2
+				WHERE number = $3;
+	`
+	_, err = tx.ExecContext(ctx, updateOrder, status, accrual, orderNumber)
+	if err != nil {
+		return err
+	}
+	// обновляю баланс пользователя если accrula успешно обработал заказ и были начислены баллы
+	if status == repositories.PROCESSED {
+		// получаю id пользователя по номеру заказа
+		id, err := s.GetIdByOrderNumber(ctx, orderNumber)
+		if err != nil {
+			return err
+		}
+		// обновляю баланс пользователя в рамках одной транзакции
+		updateBalance := `
+				UPDATE balance
+				SET current = current + $1
+				WHERE id_user = $2;
+		`
+		_, err = tx.ExecContext(ctx, updateBalance, accrual, id)
+		if err != nil {
+			return err
+		}
+	}
+
+	// коммитим транзакцию
+	return tx.Commit()
+}
+
+// обновляю инофрмацию в заказах транзакцией
+func (s Store) UpdateOrderTX(ctx context.Context, dataSlice []accrual.AccrualData) error {
+	tx, err := s.conn.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	// откат транзакции в случае ошибки
+	defer tx.Rollback()
+
+	updateOrder := `
+				UPDATE orders
+				SET status = $1,
+    				accrual = accrual + $2
+				WHERE number = $3;
+	`
+
+	for _, data := range dataSlice {
+		_, err := tx.ExecContext(ctx, updateOrder, data.Status, data.Accrual, data.Order)
+		if err != nil {
+			return err
+		}
+		// обновляю баланс пользователя если accrula успешно обработал заказ и были начислены баллы
+		if data.Status == repositories.PROCESSED {
+			// получаю id пользователя по номеру заказа
+			id, err := s.GetIdByOrderNumber(ctx, data.Order)
+			if err != nil {
+				return err
+			}
+			// обновляю баланс пользователя в рамках одной транзакции
+			updateBalance := `
+				UPDATE balance
+				SET current = current + $1
+				WHERE id_user = $2;
+			`
+			_, err = tx.ExecContext(ctx, updateBalance, data.Accrual, id)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	// коммитим транзакцию
+	return tx.Commit()
 }
 
 // выгружаю номера заказов для которых необходимо получить баллы лояльности
