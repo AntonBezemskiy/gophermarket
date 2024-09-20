@@ -27,6 +27,7 @@ func Register(res http.ResponseWriter, req *http.Request, regist repositories.Au
 		http.Error(res, err.Error(), http.StatusBadRequest)
 		return
 	}
+	logger.ServerLog.Debug("try to register new user", zap.String("login", authData.Login), zap.String("password", authData.Password))
 
 	ok, token, err := regist.Register(req.Context(), authData.Login, authData.Password)
 	if err != nil {

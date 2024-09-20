@@ -11,7 +11,6 @@ var (
 	netAddr     string
 	logLevel    string
 	databaseDsn string
-	//accrualSystemAddress  string
 )
 
 // конфигурирование приложения с приоритетом у значений флагов
@@ -21,38 +20,34 @@ func parseFlags() {
 
 	// настройка флага для хранения метрик в базе данных
 	var flagDatabaseDsn string
-	flag.StringVar(&flagDatabaseDsn, "d", "", "database connection address") // host=localhost user=metrics password=metrics dbname=metricsdb  sslmode=disable
+	flag.StringVar(&flagDatabaseDsn, "d", "", "database connection address") // пример: host=localhost user=example password=userpswd dbname=example  sslmode=disable
 
 	// настройка адреса системы расчёта начислений через флаг
 	var flagAccrualSystemAddress string
 	flag.StringVar(&flagAccrualSystemAddress, "r", "", "address of connection to accrual system")
 
 	var flagLogLevel string
-	flag.StringVar(&flagLogLevel, "l", "info", "log level")
+	flag.StringVar(&flagLogLevel, "l", "", "log level")
 
 	flag.Parse()
 
 	// устанавливаю значения равными соответствующим переменным окружения, в случае если не задан флаг и если существует
 	// переменная окружения с непустым значением
 	if flagNetAddr == "" {
-		if envRunAddr := os.Getenv("RUN_ADDRESS"); envRunAddr != "" {
-			flagNetAddr = envRunAddr
-		}
+		envRunAddr := os.Getenv("RUN_ADDRESS")
+		flagNetAddr = envRunAddr
 	}
 	if flagDatabaseDsn == "" {
-		if envDatabaseDsn := os.Getenv("DATABASE_URI"); envDatabaseDsn != "" {
-			flagDatabaseDsn = envDatabaseDsn
-		}
+		envDatabaseDsn := os.Getenv("DATABASE_URI")
+		flagDatabaseDsn = envDatabaseDsn
 	}
 	if flagAccrualSystemAddress == "" {
-		if envAccrualSystemAddress := os.Getenv("DATABASE_URI"); envAccrualSystemAddress != "" {
-			flagAccrualSystemAddress = envAccrualSystemAddress
-		}
+		envAccrualSystemAddress := os.Getenv("ACCRUAL_SYSTEM_ADDRESS")
+		flagAccrualSystemAddress = envAccrualSystemAddress
 	}
 	if flagLogLevel == "" {
-		if envLogLevel := os.Getenv("DATABASE_URI"); envLogLevel != "" {
-			flagLogLevel = envLogLevel
-		}
+		envLogLevel := os.Getenv("LOG_LEVEL")
+		flagLogLevel = envLogLevel
 	}
 
 	// устанавливаю значения по умолчанию, если значения не были заданы ни флагом, ни переменной окружения
@@ -60,17 +55,18 @@ func parseFlags() {
 		flagNetAddr = ":8080"
 	}
 	if flagDatabaseDsn == "" {
-		databaseDsn = ""
+		flagDatabaseDsn = ""
 	}
 	if flagAccrualSystemAddress == "" {
-		flagAccrualSystemAddress = ""
+		flagAccrualSystemAddress = ":8081"
 	}
 	if flagLogLevel == "" {
-		logLevel = ""
+		flagLogLevel = "info"
 	}
 
 	// устанавливаю глобальные переменные полученными значениями
 	netAddr = flagNetAddr
 	databaseDsn = flagDatabaseDsn
 	accrual.SetAccrualSystemAddress(flagAccrualSystemAddress)
+	logLevel = flagLogLevel
 }

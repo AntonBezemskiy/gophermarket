@@ -510,8 +510,8 @@ func TestWithdraw(t *testing.T) {
 	// получаю обновленный баланс пользователя id1
 	balance, err = stor.GetBalance(ctx, id1)
 	require.NoError(t, err)
-	assert.InEpsilon(t, 855.22, balance.Current, 1000.0)
-	assert.InEpsilon(t, 87.9, balance.Withdrawn, 1000.0)
+	assert.InEpsilon(t, 855.22, balance.Current, 0.0001)
+	assert.InEpsilon(t, 87.9, balance.Withdrawn, 0.0001)
 
 	// Ещё одно успешное списание средств
 	status, err = stor.Withdraw(ctx, id1, "474834550169", 423.9)
@@ -521,8 +521,8 @@ func TestWithdraw(t *testing.T) {
 	// получаю обновленный баланс пользователя id1--------
 	balance, err = stor.GetBalance(ctx, id1)
 	require.NoError(t, err)
-	assert.InEpsilon(t, 431.32, balance.Current, 1000.0)
-	assert.InEpsilon(t, 511.8, balance.Withdrawn, 1000.0)
+	assert.InEpsilon(t, 431.32, balance.Current, 0.0001)
+	assert.InEpsilon(t, 511.8, balance.Withdrawn, 0.0001)
 
 	// Получаю список данных о списаниях
 	withdrawals, status, err := stor.GetWithdrawals(ctx, id1)
@@ -530,10 +530,10 @@ func TestWithdraw(t *testing.T) {
 	assert.Equal(t, 200, status)
 	w := withdrawals[0]
 	assert.Equal(t, "474834550169", w.Order)
-	assert.InEpsilon(t, 423.9, w.Sum, 1000.0)
+	assert.InEpsilon(t, 423.9, w.Sum, 0.0001)
 	w = withdrawals[1]
 	assert.Equal(t, "218233466554", w.Order)
-	assert.InEpsilon(t, 87.9, w.Sum, 1000.0)
+	assert.InEpsilon(t, 87.9, w.Sum, 0.0001)
 
 	// тест с кодом 422 -------------------------------------
 	status, err = stor.Withdraw(ctx, id1, "wrong number", 87.9)
@@ -615,8 +615,8 @@ func TestWithdrawals(t *testing.T) {
 	// получаю обновленный баланс пользователя id1
 	balance, err = stor.GetBalance(ctx, id1)
 	require.NoError(t, err)
-	assert.InEpsilon(t, 855.22, balance.Current, 1000.0)
-	assert.InEpsilon(t, 87.9, balance.Withdrawn, 1000.0)
+	assert.InEpsilon(t, 855.22, balance.Current, 0.0001)
+	assert.InEpsilon(t, 87.9, balance.Withdrawn, 0.0001)
 
 	// Ещё одно успешное списание средств
 	status, err = stor.Withdraw(ctx, id1, "474834550169", 423.9)
@@ -626,8 +626,8 @@ func TestWithdrawals(t *testing.T) {
 	// получаю обновленный баланс пользователя id1--------
 	balance, err = stor.GetBalance(ctx, id1)
 	require.NoError(t, err)
-	assert.InEpsilon(t, 431.32, balance.Current, 1000.0)
-	assert.InEpsilon(t, 511.8, balance.Withdrawn, 1000.0)
+	assert.InEpsilon(t, 431.32, balance.Current, 0.0001)
+	assert.InEpsilon(t, 511.8, balance.Withdrawn, 0.0001)
 
 	// Получаю список данных о списаниях
 	withdrawals, status, err := stor.GetWithdrawals(ctx, id1)
@@ -635,10 +635,10 @@ func TestWithdrawals(t *testing.T) {
 	assert.Equal(t, 200, status)
 	w := withdrawals[0]
 	assert.Equal(t, "474834550169", w.Order)
-	assert.InEpsilon(t, 423.9, w.Sum, 1000.0)
+	assert.InEpsilon(t, 423.9, w.Sum, 0.0001)
 	w = withdrawals[1]
 	assert.Equal(t, "218233466554", w.Order)
-	assert.InEpsilon(t, 87.9, w.Sum, 1000.0)
+	assert.InEpsilon(t, 87.9, w.Sum, 0.0001)
 
 	// тест с кодом 422 -------------------------------------
 	status, err = stor.Withdraw(ctx, id1, "wrong number", 87.9)

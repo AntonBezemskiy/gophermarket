@@ -6,11 +6,13 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/AntonBezemskiy/gophermart/internal/accrual"
 	"github.com/AntonBezemskiy/gophermart/internal/auth"
 	"github.com/AntonBezemskiy/gophermart/internal/handlers"
 	"github.com/AntonBezemskiy/gophermart/internal/logger"
 	"github.com/AntonBezemskiy/gophermart/internal/pg"
 	"github.com/go-chi/chi/v5"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"go.uber.org/zap"
 )
 
@@ -45,35 +47,41 @@ func main() {
 	}
 	// ------------------------------------------------------------------------------
 
-	if err := run(); err != nil {
+	// в целях дебага удаляю данные из базы
+	_ = stor.Disable(ctx)
+
+	if err := run(ctx, stor); err != nil {
 		log.Fatalf("Error starting server: %v\n", err)
 	}
 }
 
 // функция run будет необходима для инициализации зависимостей сервера перед запуском
-func run() error {
+func run(ctx context.Context, stor *pg.Store) error {
 	if err := logger.Initialize(logLevel); err != nil {
 		return err
 	}
 
 	logger.ServerLog.Info("Running gophermart", zap.String("address", netAddr))
-	return http.ListenAndServe(netAddr, MetricRouter())
+	// запускаю отправку запросов к системе расчета баллов accrual в отдельной горутине
+	go accrual.UpdateAccrualData(ctx, stor, stor)
+	// запускаю сам сервис
+	return http.ListenAndServe(netAddr, MetricRouter(stor))
 }
 
-func MetricRouter() chi.Router {
+func MetricRouter(stor *pg.Store) chi.Router {
 	r := chi.NewRouter()
 
 	r.Route("/api/user", func(r chi.Router) {
-		r.Post("/register", logger.RequestLogger(handlers.RegisterHandler(nil)))
-		r.Post("/login", logger.RequestLogger(handlers.AuthenticationHandler(nil)))
-		r.Post("/orders", logger.RequestLogger(auth.Checker(handlers.LoadOrdersHandler(nil))))
-		r.Get("/orders", logger.RequestLogger(auth.Checker(handlers.GetOrdersHandler(nil))))
+		r.Post("/register", logger.RequestLogger(handlers.RegisterHandler(stor)))
+		r.Post("/login", logger.RequestLogger(handlers.AuthenticationHandler(stor)))
+		r.Post("/orders", logger.RequestLogger(auth.Checker(handlers.LoadOrdersHandler(stor))))
+		r.Get("/orders", logger.RequestLogger(auth.Checker(handlers.GetOrdersHandler(stor))))
 
 		r.Route("/balance", func(r chi.Router) {
-			r.Get("/", logger.RequestLogger(auth.Checker(handlers.GetBalanceHandler(nil))))
-			r.Post("/withdraw", logger.RequestLogger(auth.Checker(handlers.WithdrawHandler(nil))))
+			r.Get("/", logger.RequestLogger(auth.Checker(handlers.GetBalanceHandler(stor))))
+			r.Post("/withdraw", logger.RequestLogger(auth.Checker(handlers.WithdrawHandler(stor))))
 		})
-		r.Get("/withdrawals", logger.RequestLogger(auth.Checker(handlers.WithdrawalsHandler(nil))))
+		r.Get("/withdrawals", logger.RequestLogger(auth.Checker(handlers.WithdrawalsHandler(stor))))
 	})
 
 	// Определяем маршрут по умолчанию для некорректных запросов

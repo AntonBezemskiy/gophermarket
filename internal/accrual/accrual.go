@@ -3,7 +3,9 @@ package accrual
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -15,7 +17,11 @@ import (
 	"go.uber.org/zap"
 )
 
-var accrualSystemAddress string
+var (
+	accrualSystemAddress string
+	requestPeriod        time.Duration     // период между итерациями отправки запросов к accrual
+	waitOrders           time.Duration = 5 // период ожидания поступления заказов в систему
+)
 
 func SetAccrualSystemAddress(adress string) {
 	accrualSystemAddress = adress
@@ -24,8 +30,6 @@ func SetAccrualSystemAddress(adress string) {
 func GetAccrualSystemAddress() string {
 	return accrualSystemAddress
 }
-
-var requestPeriod time.Duration // период между итерациями отправки запросов к accrual
 
 func SetRequestPeriod(period time.Duration) {
 	requestPeriod = period
@@ -54,20 +58,22 @@ type Result struct {
 	requestStatus            int   // код ответа от accrual
 }
 
-func Sender(jobs <-chan int64, results chan<- Result, client *resty.Client) {
-	for {
+func Sender(jobs <-chan int64, results chan<- Result, adressAccrual string, client *resty.Client) {
+	for num := range jobs {
 		// переменная для хранения результата работы Sender
 		var responce Result
-
-		num := <-jobs
-		url := fmt.Sprintf("%s/%d", GetAccrualSystemAddress(), num)
+		url := fmt.Sprintf("http://%s/api/orders/%d", adressAccrual, num)
 
 		resp, err := client.R().
 			SetHeader("Content-Type", "text/plain").
 			Get(url)
 
 		if err != nil {
+			// отправляю ошибку и выхожу из цикла
 			responce.err = fmt.Errorf("send request to accrual error %w", err)
+			// отправка результат
+			results <- responce
+			break
 		}
 
 		stat := resp.StatusCode()
@@ -94,8 +100,11 @@ func Sender(jobs <-chan int64, results chan<- Result, client *resty.Client) {
 			} else {
 				responce.retryPeriod = retryPeriod
 			}
+			// Получаю тело ответа от accrual
+			b := resp.Body()
+			responce.message = string(b)
 		}
-		// отправка результат
+		// отправка результата
 		results <- responce
 	}
 }
@@ -110,15 +119,17 @@ func Generator(ctx context.Context, stor repositories.OrdersInterface) ([]Result
 		return nil, err
 	}
 
-	// пусть будет 10 одновременных запросов к accrual
-	const numJobs = 10
+	// устанавливаю количество запросов
+	numJobs := len(numbers)
 	// создаем буферизованный канал для принятия задач в воркер
 	jobs := make(chan int64, numJobs)
 	// создаем буферизованный канал для отправки результатов
 	results := make(chan Result, numJobs)
 
-	for w := 1; w <= 3; w++ {
-		go Sender(jobs, results, client)
+	// Запускаю одновременно 10 воркеров
+	// можно определить этот параметр через глобальную переменную
+	for w := 1; w <= 10; w++ {
+		go Sender(jobs, results, GetAccrualSystemAddress(), client)
 	}
 
 	for _, num := range numbers {
@@ -129,7 +140,7 @@ func Generator(ctx context.Context, stor repositories.OrdersInterface) ([]Result
 
 	dataFromAccrual := make([]Result, 0)
 
-	for i := 0; i < len(numbers); i++ {
+	for i := 0; i < numJobs; i++ {
 		result := <-results
 		dataFromAccrual = append(dataFromAccrual, result)
 	}
@@ -148,13 +159,46 @@ func UpdateAccrualData(ctx context.Context, stor repositories.OrdersInterface, r
 		// Устанавливаю ожидание, если был превышен лимит обращений к accrual
 		waitPeriod, err := retry.GetRetryPeriod(ctx, "accrual")
 		if err != nil {
-			logger.ServerLog.Error("internal error in GetRetryPeriod", zap.String("error", err.Error()))
+			if errors.Is(err, sql.ErrNoRows) {
+				// данные о периоде, в котором нужно прекратить обращения к accrual отсутствуют
+				// можно продолжить работу
+				logger.ServerLog.Debug("no data of retry period", zap.String("function", "UpdateAccrualData"))
+			} else {
+				// ошибка сервиса
+				logger.ServerLog.Error("internal error in GetRetryPeriod", zap.String("error", err.Error()))
+			}
+
 		} else {
+			// есть данные о дате, до которой нельзя обращаться к accrual
+			logger.ServerLog.Debug("wait until", zap.String("date", waitPeriod.Format(time.RFC3339)))
 			waitUntil(waitPeriod)
 		}
 
 		results, err := Generator(ctx, stor)
-		logger.ServerLog.Error("get error in UpdateAccrualData", zap.String("error", err.Error()))
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				// заказы для отравки в систему расчета баллов отсутствуют
+				// обрабатывать нечего, завершаю итерацию
+				logger.ServerLog.Debug("no data of orders", zap.String("function", "UpdateAccrualData"))
+				// ожидаю заказы
+				time.Sleep(waitOrders * time.Second)
+				continue
+			} else {
+				// ошибка сервиса
+				logger.ServerLog.Error("internal error in GetRetryPeriod", zap.String("error", err.Error()))
+				// прерываю итерацию
+				continue
+			}
+		}
+		if len(results) == 0 {
+			// заказы для отравки в систему расчета баллов отсутствуют
+			// обрабатывать нечего, завершаю итерацию
+			logger.ServerLog.Debug("no data of orders", zap.String("function", "UpdateAccrualData"))
+			// ожидаю заказы
+			time.Sleep(waitOrders * time.Second)
+			continue
+		}
+		logger.ServerLog.Debug("have orders to request for accrual", zap.String("count", fmt.Sprintf("%d", len(results))))
 
 		accrualData := make([]repositories.AccrualData, 0)
 

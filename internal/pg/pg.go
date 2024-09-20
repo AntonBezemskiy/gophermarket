@@ -8,8 +8,10 @@ import (
 	"time"
 
 	"github.com/AntonBezemskiy/gophermart/internal/auth"
+	"github.com/AntonBezemskiy/gophermart/internal/logger"
 	"github.com/AntonBezemskiy/gophermart/internal/repositories"
 	"github.com/AntonBezemskiy/gophermart/internal/tools"
+	"go.uber.org/zap"
 )
 
 // Store реализует интерфейс store.Store и позволяет взаимодействовать с СУБД PostgreSQL
@@ -116,6 +118,8 @@ func (s Store) Bootstrap(ctx context.Context) (err error) {
 // Disable очищает БД, удаляя записи из таблиц
 // необходима для тестирования, чтобы в процессе удалять тестовые записи
 func (s Store) Disable(ctx context.Context) (err error) {
+	logger.ServerLog.Debug("truncate all data in all tables")
+
 	// запускаем транзакцию
 	tx, err := s.conn.BeginTx(ctx, nil)
 	if err != nil {
@@ -191,6 +195,7 @@ func (s Store) Register(ctx context.Context, login string, password string) (ok 
 	if err != nil {
 		if err == sql.ErrNoRows {
 			// логин уникален, продолжаем регистрацию
+			logger.ServerLog.Debug("user is unique, continue registration process", zap.String("login", login), zap.String("password", password))
 			err = nil
 		} else {
 			// Ошибка метода Scan
@@ -542,6 +547,7 @@ func (s Store) UpdateOrderTX(ctx context.Context, dataSlice []repositories.Accru
 
 // выгружаю номера заказов для которых необходимо получить баллы лояльности
 func (s Store) GetOrdersForAccrual(ctx context.Context) (numbers []int64, err error) {
+	numbers = make([]int64, 0)
 
 	// выгружаю все заказы со статусами NEW и PROCESSING. Сортировка по времени от самых старых к самым новым заказам
 	query := `

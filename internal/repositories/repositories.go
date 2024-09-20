@@ -19,7 +19,7 @@ type AuthInterface interface {
 }
 
 type AuthData struct {
-	Login    string `json:"loggin"`   // логин пользователя
+	Login    string `json:"login"`    // логин пользователя
 	Password string `json:"password"` // пароль пользователя
 }
 
