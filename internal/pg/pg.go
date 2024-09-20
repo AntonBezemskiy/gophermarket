@@ -391,7 +391,7 @@ func (s Store) GetOrders(ctx context.Context, idUser string) (orders []repositor
 }
 
 // Метод для получения id пользователя, который загрузил данный заказ
-func (s Store) GetIdByOrderNumber(ctx context.Context, orderNumber string) (string, error) {
+func (s Store) GetIDByOrderNumber(ctx context.Context, orderNumber string) (string, error) {
 	// Преобразую номер заказа из строки в int64
 	orderNumberInt, err := strconv.ParseInt(orderNumber, 10, 64)
 	if err != nil {
@@ -480,7 +480,7 @@ func (s Store) UpdateOrder(ctx context.Context, orderNumber string, status strin
 	// обновляю баланс пользователя если accrula успешно обработал заказ и были начислены баллы
 	if status == repositories.PROCESSED {
 		// получаю id пользователя по номеру заказа
-		id, err := s.GetIdByOrderNumber(ctx, orderNumber)
+		id, err := s.GetIDByOrderNumber(ctx, orderNumber)
 		if err != nil {
 			return err
 		}
@@ -524,7 +524,7 @@ func (s Store) UpdateOrderTX(ctx context.Context, dataSlice []repositories.Accru
 		// обновляю баланс пользователя если accrula успешно обработал заказ и были начислены баллы
 		if data.Status == repositories.PROCESSED {
 			// получаю id пользователя по номеру заказа
-			id, err := s.GetIdByOrderNumber(ctx, data.Order)
+			id, err := s.GetIDByOrderNumber(ctx, data.Order)
 			if err != nil {
 				return err
 			}

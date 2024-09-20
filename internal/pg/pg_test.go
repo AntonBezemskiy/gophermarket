@@ -170,13 +170,13 @@ func TestGetIdByOrderNumber(t *testing.T) {
 		assert.Equal(t, 202, status)
 
 		// получаю id пользователя по номеру заказа
-		idDB, err := stor.GetIdByOrderNumber(ctx, "555731750165")
+		idDB, err := stor.GetIDByOrderNumber(ctx, "555731750165")
 		require.NoError(t, err)
 		assert.Equal(t, id, idDB)
 
 		// тест с ошибкой ------------------------------------------------
 		// пытаюсь получить id пользователя по номеру заказа, хотя заказ не добавлен в систему
-		_, err = stor.GetIdByOrderNumber(ctx, "218233466554")
+		_, err = stor.GetIDByOrderNumber(ctx, "218233466554")
 		require.Error(t, err)
 
 		// Удаление данных из тестовых таблиц для выполнения следующих тестов------------------------------------------
