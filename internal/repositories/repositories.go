@@ -45,8 +45,8 @@ const (
 )
 
 type Order struct {
-	Number     int64     `json:"number"`      // номер заказа
-	Status     string    `json:"status"`      // стату обработки заказа
+	Number     string    `json:"number"`      // номер заказа
+	Status     string    `json:"status"`      // статус обработки заказа
 	Accrual    float64   `json:"accrual"`     // сумма начисленных бонусов за заказ
 	UploadedAt time.Time `json:"uploaded_at"` // время загрузки заказа
 }

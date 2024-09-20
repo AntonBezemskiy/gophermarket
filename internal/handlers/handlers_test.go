@@ -734,7 +734,7 @@ func TestGetOrders(t *testing.T) {
 		loadT := time.Date(2003, time.May, 1, 17, 1, 21, 0, time.UTC)
 
 		order := repositories.Order{
-			Number:     1234,
+			Number:     "1234",
 			Status:     "PROCESSED",
 			Accrual:    500,
 			UploadedAt: loadT,
@@ -851,7 +851,7 @@ func TestGetOrders(t *testing.T) {
 		{
 			// предварительно загружаю в базу заказы-------------------------
 			order1 := repositories.Order{
-				Number: 562246784655,
+				Number: "562246784655",
 				Status: repositories.NEW,
 			}
 			status, err := stor.Load(ctx, "user id 200", "562246784655")
@@ -861,7 +861,7 @@ func TestGetOrders(t *testing.T) {
 			time.Sleep(100 * time.Millisecond)
 
 			order2 := repositories.Order{
-				Number: 657064403758,
+				Number: "657064403758",
 				Status: repositories.NEW,
 			}
 			status, err = stor.Load(ctx, "user id 200", "657064403758")
@@ -870,7 +870,7 @@ func TestGetOrders(t *testing.T) {
 			time.Sleep(100 * time.Millisecond)
 
 			order3 := repositories.Order{
-				Number: 767611725239,
+				Number: "767611725239",
 				Status: repositories.NEW,
 			}
 			status, err = stor.Load(ctx, "user id 200", "767611725239")
