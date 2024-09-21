@@ -13,8 +13,14 @@ const (
 	PROCESSED  = "PROCESSED"
 )
 
+const (
+	REGISTEROK = iota
+	REGISTERINVALIDREQUEST
+	REGISTERLOGINISALREADYUSED
+)
+
 type AuthInterface interface {
-	Register(ctx context.Context, login string, password string) (ok bool, token string, err error)     // return values is Ok, token and error. Ok is false when login of user is not unique
+	Register(ctx context.Context, login string, password string) (status int, token string, err error)     // return values is Ok, token and error. Ok is false when login of user is not unique
 	Authenticate(ctx context.Context, login string, password string) (ok bool, token string, err error) // return values is Ok, token and error. Ok is false when login or password of user is wrong
 }
 

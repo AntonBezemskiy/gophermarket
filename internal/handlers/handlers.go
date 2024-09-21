@@ -29,15 +29,25 @@ func Register(res http.ResponseWriter, req *http.Request, regist repositories.Au
 	}
 	logger.ServerLog.Debug("try to register new user", zap.String("login", authData.Login), zap.String("password", authData.Password))
 
-	ok, token, err := regist.Register(req.Context(), authData.Login, authData.Password)
+	status, token, err := regist.Register(req.Context(), authData.Login, authData.Password)
 	if err != nil {
 		logger.ServerLog.Error("register new user error", zap.String("address", req.URL.String()), zap.String("error: ", error.Error(err)))
 		http.Error(res, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if !ok {
+	if status == repositories.REGISTERINVALIDREQUEST{
+		logger.ServerLog.Error("register of new user is failed", zap.String("address", req.URL.String()), zap.String("error", "invalid request"))
+		http.Error(res, "login is not unique", http.StatusBadRequest)
+		return
+	}
+	if status == repositories.REGISTERLOGINISALREADYUSED {
 		logger.ServerLog.Error("register of new user is failed", zap.String("address", req.URL.String()), zap.String("error", "login is not unique"))
 		http.Error(res, "login is not unique", http.StatusConflict)
+		return
+	}
+	if status != repositories.REGISTEROK{
+		logger.ServerLog.Error("register new user error", zap.String("address", req.URL.String()), zap.String("error: ","invalid return status from storage"))
+		http.Error(res, "invalid return status from storage", http.StatusInternalServerError)
 		return
 	}
 

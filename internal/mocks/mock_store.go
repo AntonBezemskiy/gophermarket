@@ -52,10 +52,10 @@ func (mr *MockAuthInterfaceMockRecorder) Authenticate(arg0, arg1, arg2 interface
 }
 
 // Register mocks base method.
-func (m *MockAuthInterface) Register(arg0 context.Context, arg1, arg2 string) (bool, string, error) {
+func (m *MockAuthInterface) Register(arg0 context.Context, arg1, arg2 string) (int, string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Register", arg0, arg1, arg2)
-	ret0, _ := ret[0].(bool)
+	ret0, _ := ret[0].(int)
 	ret1, _ := ret[1].(string)
 	ret2, _ := ret[2].(error)
 	return ret0, ret1, ret2

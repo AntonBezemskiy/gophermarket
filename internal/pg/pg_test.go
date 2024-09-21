@@ -157,9 +157,9 @@ func TestGetIdByOrderNumber(t *testing.T) {
 
 		// успешный тест ---------------------------------------------
 		// Регистрирую нового пользователя
-		ok, token, err := stor.Register(ctx, "new", "user")
+		eStatus, token, err := stor.Register(ctx, "new", "user")
 		require.NoError(t, err)
-		assert.Equal(t, true, ok)
+		assert.Equal(t, repositories.REGISTEROK, eStatus)
 		// получаю id зарегистрированного пользователя
 		id, err := auth.GetUserID(token)
 		require.NoError(t, err)
@@ -214,9 +214,9 @@ func TestUpdateBalance(t *testing.T) {
 		}
 
 		// Регистрирую нового пользователя
-		ok, token, err := stor.Register(ctx, "new", "user")
+		rStatus, token, err := stor.Register(ctx, "new", "user")
 		require.NoError(t, err)
-		assert.Equal(t, true, ok)
+		assert.Equal(t, repositories.REGISTEROK, rStatus)
 		// получаю id зарегистрированного пользователя
 		id, err := auth.GetUserID(token)
 		require.NoError(t, err)
@@ -277,9 +277,9 @@ func TestUpdateOrder(t *testing.T) {
 
 		// успешный тест--------------------------------------
 		// Регистрирую нового пользователя
-		ok, token, err := stor.Register(ctx, "new", "user")
+		rStatus, token, err := stor.Register(ctx, "new", "user")
 		require.NoError(t, err)
-		assert.Equal(t, true, ok)
+		assert.Equal(t, repositories.REGISTEROK, rStatus)
 		// получаю id зарегистрированного пользователя
 		id1, err := auth.GetUserID(token)
 		require.NoError(t, err)
@@ -355,17 +355,17 @@ func TestUpdateOrderTX(t *testing.T) {
 
 		// успешный тест--------------------------------------
 		// Регистрирую нового пользователя 1
-		ok, token, err := stor.Register(ctx, "new1", "user1")
+		rStatus, token, err := stor.Register(ctx, "new1", "user1")
 		require.NoError(t, err)
-		assert.Equal(t, true, ok)
+		assert.Equal(t, repositories.REGISTEROK, rStatus)
 		// получаю id зарегистрированного пользователя
 		id1, err := auth.GetUserID(token)
 		require.NoError(t, err)
 
 		// Регистрирую нового пользователя 2
-		ok, token, err = stor.Register(ctx, "new2", "user2")
+		rStatus, token, err = stor.Register(ctx, "new2", "user2")
 		require.NoError(t, err)
-		assert.Equal(t, true, ok)
+		assert.Equal(t, repositories.REGISTEROK, rStatus)
 		// получаю id зарегистрированного пользователя
 		id2, err := auth.GetUserID(token)
 		require.NoError(t, err)
@@ -470,9 +470,9 @@ func TestWithdraw(t *testing.T) {
 
 	// успешный тест------------------------------------------------------
 	// Регистрирую нового пользователя 1
-	ok, token, err := stor.Register(ctx, "new1", "user1")
+	rStatus, token, err := stor.Register(ctx, "new1", "user1")
 	require.NoError(t, err)
-	assert.Equal(t, true, ok)
+	assert.Equal(t, repositories.REGISTEROK, rStatus)
 	// получаю id зарегистрированного пользователя
 	id1, err := auth.GetUserID(token)
 	require.NoError(t, err)
@@ -575,9 +575,9 @@ func TestWithdrawals(t *testing.T) {
 
 	// успешный тест------------------------------------------------------
 	// Регистрирую нового пользователя 1
-	ok, token, err := stor.Register(ctx, "new1", "user1")
+	rStatus, token, err := stor.Register(ctx, "new1", "user1")
 	require.NoError(t, err)
-	assert.Equal(t, true, ok)
+	assert.Equal(t, repositories.REGISTEROK, rStatus)
 	// получаю id зарегистрированного пользователя
 	id1, err := auth.GetUserID(token)
 	require.NoError(t, err)
@@ -652,9 +652,9 @@ func TestWithdrawals(t *testing.T) {
 
 	// тест с кодом 204------------------------------------------
 	// регистрирую нового пользователя
-	ok, token, err = stor.Register(ctx, "new3", "user3")
+	rStatus, token, err = stor.Register(ctx, "new3", "user3")
 	require.NoError(t, err)
-	assert.Equal(t, true, ok)
+	assert.Equal(t, repositories.REGISTEROK, rStatus)
 	// получаю id зарегистрированного пользователя
 	id3, err := auth.GetUserID(token)
 	require.NoError(t, err)

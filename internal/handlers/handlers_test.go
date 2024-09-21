@@ -89,10 +89,20 @@ func TestRegister(t *testing.T) {
 
 		token, err := auth.BuildJWTString(24)
 		require.NoError(t, err)
-		m.EXPECT().Register(gomock.Any(), "successLogin", "successPassword").Return(true, token, nil)
+		m.EXPECT().Register(gomock.Any(), "successLogin", "successPassword").Return(repositories.REGISTEROK, token, nil)
+
+		// тестовый случай с кодом 400-------------------------------------------------------------------
+		m.EXPECT().Register(gomock.Any(), "empty login", "password").Return(repositories.REGISTERINVALIDREQUEST, "", nil)
+		// Создаю тело запроса с логином и паролем пользователя
+		authData = *repositories.NewAuthData("empty login", "password")
+		// сериализую струтктуру с логином и паролем в json-представление в виде слайса байт
+		var bufEncode400 bytes.Buffer
+		enc = json.NewEncoder(&bufEncode400)
+		err = enc.Encode(authData)
+		require.NoError(t, err)
 
 		// тестовый случай с кодом 409-------------------------------------------------------------------
-		m.EXPECT().Register(gomock.Any(), "loginIsUsed", "password").Return(false, "", nil)
+		m.EXPECT().Register(gomock.Any(), "loginIsUsed", "password").Return(repositories.REGISTERLOGINISALREADYUSED, "", nil)
 		// Создаю тело запроса с логином и паролем пользователя
 		authData = *repositories.NewAuthData("loginIsUsed", "password")
 		// сериализую струтктуру с логином и паролем в json-представление в виде слайса байт
@@ -102,7 +112,7 @@ func TestRegister(t *testing.T) {
 		require.NoError(t, err)
 
 		// тестовый случай с кодом 500-------------------------------------------------------------------
-		m.EXPECT().Register(gomock.Any(), "loginError", "password").Return(true, "", fmt.Errorf("test case of 500 status"))
+		m.EXPECT().Register(gomock.Any(), "loginError", "password").Return(0, "", fmt.Errorf("test case of 500 status"))
 		// Создаю тело запроса с логином и паролем пользователя
 		authData = *repositories.NewAuthData("loginError", "password")
 		// сериализую струтктуру с логином и паролем в json-представление в виде слайса байт
@@ -130,6 +140,12 @@ func TestRegister(t *testing.T) {
 			{
 				name:       "wrong format of request, status 400",
 				body:       nil,
+				wantStatus: 400,
+				wantError:  true,
+			},
+			{
+				name:       "wrong format of request, status 400",
+				body:       &bufEncode400,
 				wantStatus: 400,
 				wantError:  true,
 			},
@@ -213,12 +229,12 @@ func TestRegister(t *testing.T) {
 		err = enc.Encode(authData)
 		require.NoError(t, err)
 
-		// тестовый случай с кодом 500-------------------------------------------------------------------
+		// тестовый случай с кодом 400-------------------------------------------------------------------
 		// Создаю тело запроса с логином и паролем пользователя
 		authData = *repositories.NewAuthData("", "password")
 		// сериализую струтктуру с логином и паролем в json-представление в виде слайса байт
-		var bufEncode500 bytes.Buffer
-		enc = json.NewEncoder(&bufEncode500)
+		var bufEncode400 bytes.Buffer
+		enc = json.NewEncoder(&bufEncode400)
 		err = enc.Encode(authData)
 		require.NoError(t, err)
 
@@ -249,9 +265,9 @@ func TestRegister(t *testing.T) {
 				wantError:  true,
 			},
 			{
-				name:       "internal server error, status 500",
-				body:       &bufEncode500,
-				wantStatus: 500,
+				name:       "invalig login or password, status 400",
+				body:       &bufEncode400,
+				wantStatus: 400,
 				wantError:  true,
 			},
 		}
@@ -413,9 +429,9 @@ func TestAuthentication(t *testing.T) {
 		//------------------------------------------------------------------------------------------------------
 
 		//регистрирую пользователя для успешного прохождения следующих тестов
-		rOk, _, rErr := stor.Register(ctx, "Login", "Password")
+		rStatus, _, rErr := stor.Register(ctx, "Login", "Password")
 		require.NoError(t, rErr)
-		assert.Equal(t, true, rOk)
+		assert.Equal(t, repositories.REGISTEROK, rStatus)
 
 		// тестовый случай с кодом 200---------------------------------------------------------
 		// Создаю тело запроса с логином и паролем пользователя
@@ -1023,9 +1039,9 @@ func TestGetBalance(t *testing.T) {
 		// тестовый случай с кодом 200 без задействования системы accrual
 		{
 			// Регистрирую нового пользователя
-			ok, token, err := stor.Register(ctx, "login", "password")
+			status, token, err := stor.Register(ctx, "login", "password")
 			require.NoError(t, err)
-			assert.Equal(t, true, ok)
+			assert.Equal(t, repositories.REGISTEROK, status)
 			// получаю id пользователя из токена
 			id, err := auth.GetUserID(token)
 			require.NoError(t, err)

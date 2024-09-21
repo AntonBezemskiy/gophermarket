@@ -174,11 +174,12 @@ func (s Store) Disable(ctx context.Context) (err error) {
 }
 
 // Регистрация пользователя в системе. Создаю таблицу с учетными данными пользователя, а так-же таблицу с балансом пользователя
-func (s Store) Register(ctx context.Context, login string, password string) (ok bool, token string, err error) {
+func (s Store) Register(ctx context.Context, login string, password string) (status int, token string, err error) {
 	// проверка валидности логина и пароля
 	// наверное лучше вместо ошибки возвращать статус вроде http.StatusBadRequest
 	if login == "" || password == "" {
-		err = fmt.Errorf("login or password is invalid")
+		// данные запроса некорректны, возвращаю соответствующий стату
+		status = repositories.REGISTERINVALIDREQUEST
 		return
 	}
 
@@ -203,7 +204,7 @@ func (s Store) Register(ctx context.Context, login string, password string) (ok 
 		}
 	} else {
 		// пользователь не уникален
-		ok = false
+		status = repositories.REGISTERLOGINISALREADYUSED
 		return
 	}
 
@@ -238,7 +239,7 @@ func (s Store) Register(ctx context.Context, login string, password string) (ok 
 		return
 	}
 
-	ok = true
+	status = repositories.REGISTEROK
 	return
 }
 
