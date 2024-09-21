@@ -322,10 +322,10 @@ func TestAuthentication(t *testing.T) {
 
 		token, err := auth.BuildJWTString(24)
 		require.NoError(t, err)
-		m.EXPECT().Authenticate(gomock.Any(), "successLogin", "successPassword").Return(true, token, nil)
+		m.EXPECT().Authenticate(gomock.Any(), "successLogin", "successPassword").Return(repositories.LOGINOK, token, nil)
 
 		// тестовый случай с кодом 401-------------------------------------------------------------------
-		m.EXPECT().Authenticate(gomock.Any(), "loginIsUsed", "password").Return(false, "", nil)
+		m.EXPECT().Authenticate(gomock.Any(), "loginIsUsed", "password").Return(repositories.LOGINWRONGLOGINORPASSWORD, "", nil)
 		// Создаю тело запроса с логином и паролем пользователя
 		authData = *repositories.NewAuthData("loginIsUsed", "password")
 		// сериализую струтктуру с логином и паролем в json-представление в виде слайса байт
@@ -335,7 +335,7 @@ func TestAuthentication(t *testing.T) {
 		require.NoError(t, err)
 
 		// тестовый случай с кодом 500-------------------------------------------------------------------
-		m.EXPECT().Authenticate(gomock.Any(), "loginError", "password").Return(true, "", fmt.Errorf("test case of 500 status"))
+		m.EXPECT().Authenticate(gomock.Any(), "loginError", "password").Return(0, "", fmt.Errorf("test case of 500 status"))
 		// Создаю тело запроса с логином и паролем пользователя
 		authData = *repositories.NewAuthData("loginError", "password")
 		// сериализую струтктуру с логином и паролем в json-представление в виде слайса байт
@@ -456,11 +456,11 @@ func TestAuthentication(t *testing.T) {
 		err = enc.Encode(authData)
 		require.NoError(t, err)
 
-		// тестовый случай с кодом 500-------------------------------------------------------------------
+		// тестовый случай с кодом 400-------------------------------------------------------------------
 		// Создаю тело запроса с логином и паролем пользователя
 		authData = *repositories.NewAuthData("", "password")
-		var bufEncode500 bytes.Buffer
-		enc = json.NewEncoder(&bufEncode500)
+		var bufEncode400 bytes.Buffer
+		enc = json.NewEncoder(&bufEncode400)
 		err = enc.Encode(authData)
 		require.NoError(t, err)
 
@@ -497,9 +497,9 @@ func TestAuthentication(t *testing.T) {
 				wantError:  true,
 			},
 			{
-				name:       "internal server error, status 500",
-				body:       &bufEncode500,
-				wantStatus: 500,
+				name:       "login or password is wrong, status 400",
+				body:       &bufEncode400,
+				wantStatus: 400,
 				wantError:  true,
 			},
 		}

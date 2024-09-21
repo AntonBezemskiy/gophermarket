@@ -176,7 +176,7 @@ func (s Store) Disable(ctx context.Context) (err error) {
 // Регистрация пользователя в системе. Создаю таблицу с учетными данными пользователя, а так-же таблицу с балансом пользователя
 func (s Store) Register(ctx context.Context, login string, password string) (status int, token string, err error) {
 	// проверка валидности логина и пароля
-	// наверное лучше вместо ошибки возвращать статус вроде http.StatusBadRequest
+	// в случае неверных данных возвращается http.StatusBadRequest
 	if login == "" || password == "" {
 		// данные запроса некорректны, возвращаю соответствующий стату
 		status = repositories.REGISTERINVALIDREQUEST
@@ -243,11 +243,11 @@ func (s Store) Register(ctx context.Context, login string, password string) (sta
 	return
 }
 
-func (s Store) Authenticate(ctx context.Context, login string, password string) (ok bool, token string, err error) {
+func (s Store) Authenticate(ctx context.Context, login string, password string) (status int, token string, err error) {
 	// проверка валидности логина и пароля
-	// наверное лучше вместо ошибки возвращать статус вроде http.StatusBadRequest
+	// в случае неверных данных возвращается http.StatusBadRequest
 	if login == "" || password == "" {
-		err = fmt.Errorf("login or password is invalid")
+		status = repositories.LOGININVALIDREQUEST
 		return
 	}
 
@@ -266,7 +266,7 @@ func (s Store) Authenticate(ctx context.Context, login string, password string) 
 		if err == sql.ErrNoRows {
 			// логин уникален, пользователь не зарегистрирован. Вместо ошибки возвращаю соотвествующий статус
 			err = nil
-			ok = false
+			status = repositories.LOGINWRONGLOGINORPASSWORD
 			return
 		} else {
 			// Ошибка метода Scan
@@ -276,10 +276,10 @@ func (s Store) Authenticate(ctx context.Context, login string, password string) 
 
 	// проверяю указанный пароль на соотвествие с тем, что хранится в базе
 	if password != passwordFromDB {
-		ok = false
+		status = repositories.LOGINWRONGLOGINORPASSWORD
 		return
 	}
-	ok = true
+	status = repositories.LOGINOK
 	return
 }
 

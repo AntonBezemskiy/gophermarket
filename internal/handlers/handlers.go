@@ -68,15 +68,25 @@ func Authentication(res http.ResponseWriter, req *http.Request, authRep reposito
 		return
 	}
 
-	ok, token, err := authRep.Authenticate(req.Context(), authData.Login, authData.Password)
+	status, token, err := authRep.Authenticate(req.Context(), authData.Login, authData.Password)
 	if err != nil {
 		logger.ServerLog.Error("authentication of user error", zap.String("address", req.URL.String()), zap.String("error: ", error.Error(err)))
 		http.Error(res, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if !ok {
+	if status == repositories.LOGININVALIDREQUEST{
+		logger.ServerLog.Error("authentication of user is failed", zap.String("address", req.URL.String()), zap.String("error", "login or password is invalid"))
+		http.Error(res, "login or password is invalid", http.StatusBadRequest)
+		return
+	}
+	if status == repositories.LOGINWRONGLOGINORPASSWORD {
 		logger.ServerLog.Error("authentication of user is failed", zap.String("address", req.URL.String()), zap.String("error", "login or password is wrong"))
 		http.Error(res, "login or password is wrong", http.StatusUnauthorized)
+		return
+	}
+	if status != repositories.LOGINOK{
+		logger.ServerLog.Error("authentication of user is failed", zap.String("address", req.URL.String()), zap.String("error: ","invalid return status from storage"))
+		http.Error(res, "invalid return status from storage", http.StatusInternalServerError)
 		return
 	}
 
