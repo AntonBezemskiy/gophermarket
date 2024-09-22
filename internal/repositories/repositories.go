@@ -57,16 +57,16 @@ const (
 )
 
 type Order struct {
-	Number     string    `json:"number"`      // номер заказа
-	Status     string    `json:"status"`      // статус обработки заказа
-	Accrual    float64   `json:"accrual"`     // сумма начисленных бонусов за заказ
-	UploadedAt time.Time `json:"uploaded_at"` // время загрузки заказа
+	Number     string    `json:"number"`            // номер заказа
+	Status     string    `json:"status"`            // статус обработки заказа
+	Accrual    float64   `json:"accrual,omitempty"` // сумма начисленных бонусов за заказ
+	UploadedAt time.Time `json:"uploaded_at"`       // время загрузки заказа
 }
 
 type AccrualData struct {
-	Order   string  `json:"order"`   // номер заказа
-	Status  string  `json:"status"`  // статус обработки заказа
-	Accrual float64 `json:"accrual"` // статус расчёта начисления
+	Order   string  `json:"order"`             // номер заказа
+	Status  string  `json:"status"`            // статус обработки заказа
+	Accrual float64 `json:"accrual,omitempty"` // статус расчёта начисления
 }
 
 type OrdersInterface interface {

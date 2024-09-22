@@ -1,7 +1,9 @@
 package accrual
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net"
@@ -52,8 +54,8 @@ func TestSender(t *testing.T) {
 	// Запускаем программу
 	accrualPort, err := getFreePort()
 	require.NoError(t, err)
-	accrulaAdress := fmt.Sprintf("localhost:%d", accrualPort)
-	cmd := exec.Command("./../../cmd/accrual/accrual_linux_amd64", fmt.Sprintf("-a=%s", accrulaAdress))
+	accrualAdress := fmt.Sprintf("localhost:%d", accrualPort)
+	cmd := exec.Command("./../../cmd/accrual/accrual_linux_amd64", fmt.Sprintf("-a=%s", accrualAdress))
 
 	// Связываем стандартный вывод и ошибки программы с выводом программы Go
 	cmd.Stdout = log.Writer()
@@ -66,7 +68,7 @@ func TestSender(t *testing.T) {
 
 	// Запуск тестов------------------------------------
 	// устанавливаю адрес доступа к системе accrual
-	SetAccrualSystemAddress(fmt.Sprintf("http://%s", accrulaAdress))
+	SetAccrualSystemAddress(fmt.Sprintf("http://%s", accrualAdress))
 
 	// тест с кодом 204: заказ не зарегистрирован в системе расчёта
 	{
@@ -88,8 +90,7 @@ func TestSender(t *testing.T) {
 	// тест с кодом 200
 	{
 		client := resty.New()
-
-		// добавляю в систему тестовые данные
+		// добавляю в систему тестовый заказ
 		request1 := Request{
 			Order: "155047814506",
 			Goods: []Good{
@@ -99,12 +100,16 @@ func TestSender(t *testing.T) {
 				},
 			},
 		}
+		var b bytes.Buffer
+		enc := json.NewEncoder(&b)
+		err = enc.Encode(request1)
+		require.NoError(t, err)
 
 		// отправляю заказ в систему
 		resp, err := client.R().
 			SetHeader("Content-Type", "application/json").
-			SetResult(request1).
-			Post(fmt.Sprintf("http://%s/api/orders", accrulaAdress))
+			SetBody(b.Bytes()).
+			Post(fmt.Sprintf("http://%s/api/orders", accrualAdress))
 		require.NoError(t, err)
 		assert.Equal(t, 202, resp.StatusCode())
 
@@ -132,11 +137,15 @@ func TestSender(t *testing.T) {
 			Reward:     5000,
 			RewardType: "pt",
 		}
+		var r bytes.Buffer
+		enc := json.NewEncoder(&r)
+		err := enc.Encode(reward)
+		require.NoError(t, err)
 		// отправляю заказ в систему
 		resp, err := client.R().
 			SetHeader("Content-Type", "application/json").
-			SetResult(reward).
-			Post(fmt.Sprintf("http://%s/api/goods", accrulaAdress))
+			SetBody(r.Bytes()).
+			Post(fmt.Sprintf("http://%s/api/goods", accrualAdress))
 		require.NoError(t, err)
 		assert.Equal(t, 200, resp.StatusCode())
 
@@ -150,12 +159,16 @@ func TestSender(t *testing.T) {
 				},
 			},
 		}
+		var b bytes.Buffer
+		enc = json.NewEncoder(&b)
+		err = enc.Encode(request1)
+		require.NoError(t, err)
 
 		// отправляю заказ в систему
 		resp, err = client.R().
 			SetHeader("Content-Type", "application/json").
-			SetResult(request1).
-			Post(fmt.Sprintf("http://%s/api/orders", accrulaAdress))
+			SetBody(b.Bytes()).
+			Post(fmt.Sprintf("http://%s/api/orders", accrualAdress))
 		require.NoError(t, err)
 		assert.Equal(t, 202, resp.StatusCode())
 
@@ -200,9 +213,9 @@ func TestGenerator(t *testing.T) {
 	// Запускаем программу
 	accrualPort, err := getFreePort()
 	require.NoError(t, err)
-	accrulaAdress := fmt.Sprintf(":%d", accrualPort)
+	accrualAdress := fmt.Sprintf(":%d", accrualPort)
 
-	cmd := exec.Command("./../../cmd/accrual/accrual_linux_amd64", fmt.Sprintf("-a=%s", accrulaAdress))
+	cmd := exec.Command("./../../cmd/accrual/accrual_linux_amd64", fmt.Sprintf("-a=%s", accrualAdress))
 
 	// Связываем стандартный вывод и ошибки программы с выводом программы Go
 	cmd.Stdout = log.Writer()
@@ -215,7 +228,7 @@ func TestGenerator(t *testing.T) {
 
 	// Запуск тестов------------------------------------
 	// устанавливаю адрес доступа к системе accrual
-	SetAccrualSystemAddress(fmt.Sprintf("http://%s", accrulaAdress))
+	SetAccrualSystemAddress(fmt.Sprintf("http://%s", accrualAdress))
 
 	// тест с кодом 204: заказ не зарегистрирован в системе расчёта
 	{

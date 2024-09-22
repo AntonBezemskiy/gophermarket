@@ -526,8 +526,67 @@ func TestGophermart(t *testing.T) {
 		}
 		// тесты после загрузки заказов
 		{
-			// Ожидание, чтобы gophermart успел обновить информацию в заказах, полученную от accrual
-			time.Sleep(3 * time.Second)
+			{
+				// Создаем HTTP клиент
+				client := resty.New()
+
+				// Устанавливаем таймаут на 20 секунд
+				ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+				defer cancel()
+
+				// Создаем тикер, который будет отправлять запрос каждую секунду
+				ticker := time.NewTicker(1 * time.Second)
+				defer ticker.Stop()
+
+				// Используем метку для внешнего цикла
+			loop:
+				for {
+					select {
+					case <-ctx.Done():
+						fmt.Println("Таймаут: не удалось дождаться обработки заказа")
+						break loop // Завершаем внешний цикл
+					case <-ticker.C:
+						var orders []repositories.Order
+
+						// Выполняем запрос
+						resp, err := client.R().
+							SetContext(ctx).
+							SetResult(&orders).
+							Get(fmt.Sprintf("http://%s/api/user/orders", accrualAdress))
+
+						// Проверяем наличие ошибки
+						if err != nil {
+							fmt.Printf("Ошибка при запросе: %v\n", err)
+							continue
+						}
+
+						// Проверяем статус ответа
+						if resp.StatusCode() != 200 && resp.StatusCode() != 204 {
+							fmt.Printf("Ожидался статус 200 или 204, получен: %d\n", resp.StatusCode())
+							continue
+						}
+
+						// Проверяем заголовок Content-Type
+						contentType := resp.Header().Get("Content-Type")
+						if contentType != "application/json" {
+							fmt.Printf("Ожидался Content-Type: application/json, получен: %s\n", contentType)
+							continue
+						}
+
+						// Проверяем статус заказа
+						if len(orders) == 0 || orders[0].Status != "PROCESSED" {
+							fmt.Println("Заказ еще не обработан")
+							continue
+						}
+
+						// Выводим информацию о заказе
+						order := orders[0]
+						fmt.Printf("Заказ обработан. Номер: %s, Начислено: %.2f\n", order.Number, order.Accrual)
+
+						break loop // Завершаем внешний цикл, так как заказ обработан
+					}
+				}
+			}
 
 			// получение списка загруженных заказов зарегистрированного пользователя
 			{

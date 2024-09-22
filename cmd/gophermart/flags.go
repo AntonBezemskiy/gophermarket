@@ -62,7 +62,7 @@ func parseFlags() {
 		flagAccrualSystemAddress = ":8081"
 	}
 	if flagLogLevel == "" {
-		flagLogLevel = "debug"
+		flagLogLevel = "info"
 	}
 
 	// устанавливаю глобальные переменные полученными значениями

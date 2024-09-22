@@ -28,6 +28,9 @@ import (
 // mockgen -destination=internal/mocks/mock_store.go &&
 // -package=mocks github.com/AntonBezemskiy/gophermart/internal/repositories AuthInterface,OrdersInterface,BalanceInterface,WithdrawInterface,WithdrawalsInterface
 
+// инициализация базы данных-------------------------------------------------------------------
+var databaseDsn string = "host=localhost user=testgophermart password=newpassword dbname=testgophermart sslmode=disable"
+
 func TestNotFound(t *testing.T) {
 	type want struct {
 		code        int
@@ -192,9 +195,6 @@ func TestRegister(t *testing.T) {
 	// тесты с базой данных
 	// предварительно необходимо создать тестовую БД и определить параметры сединения host=host user=user password=password dbname=dbname  sslmode=disable
 	{
-		// инициализация базы данных-------------------------------------------------------------------
-		databaseDsn := "host=localhost user=testgophermart password=newpassword dbname=testgophermart sslmode=disable"
-
 		// создаём соединение с СУБД PostgreSQL
 		conn, err := sql.Open("pgx", databaseDsn)
 		require.NoError(t, err)
@@ -409,9 +409,6 @@ func TestAuthentication(t *testing.T) {
 	// тесты с базой данных
 	// предварительно необходимо создать тестовую БД и определить параметры сединения host=host user=user password=password dbname=dbname  sslmode=disable
 	{
-		// инициализация базы данных-------------------------------------------------------------------
-		databaseDsn := "host=localhost user=testgophermart password=newpassword dbname=testgophermart sslmode=disable"
-
 		// создаём соединение с СУБД PostgreSQL
 		conn, err := sql.Open("pgx", databaseDsn)
 		require.NoError(t, err)
@@ -628,9 +625,6 @@ func TestLoadOrders(t *testing.T) {
 	// тесты с базой данных
 	// предварительно необходимо создать тестовую БД и определить параметры сединения host=host user=user password=password dbname=dbname  sslmode=disable
 	{
-		// инициализация базы данных-------------------------------------------------------------------
-		databaseDsn := "host=localhost user=testgophermart password=newpassword dbname=testgophermart sslmode=disable"
-
 		// создаём соединение с СУБД PostgreSQL
 		conn, err := sql.Open("pgx", databaseDsn)
 		require.NoError(t, err)
@@ -824,9 +818,6 @@ func TestGetOrders(t *testing.T) {
 	// тесты с базой данных
 	// предварительно необходимо создать тестовую БД и определить параметры сединения host=host user=user password=password dbname=dbname  sslmode=disable
 	{
-		// инициализация базы данных-------------------------------------------------------------------
-		databaseDsn := "host=localhost user=testgophermart password=newpassword dbname=testgophermart sslmode=disable"
-
 		// создаём соединение с СУБД PostgreSQL
 		conn, err := sql.Open("pgx", databaseDsn)
 		require.NoError(t, err)
@@ -1017,9 +1008,6 @@ func TestGetBalance(t *testing.T) {
 	// тесты с базой данных
 	// предварительно необходимо создать тестовую БД и определить параметры сединения host=host user=user password=password dbname=dbname  sslmode=disable
 	{
-		// инициализация базы данных-------------------------------------------------------------------
-		databaseDsn := "host=localhost user=testgophermart password=newpassword dbname=testgophermart sslmode=disable"
-
 		// создаём соединение с СУБД PostgreSQL
 		conn, err := sql.Open("pgx", databaseDsn)
 		require.NoError(t, err)
