@@ -53,7 +53,7 @@ func parseFlags() {
 
 	// устанавливаю значения по умолчанию, если значения не были заданы ни флагом, ни переменной окружения
 	if flagNetAddr == "" {
-		flagNetAddr = ":8080"
+		flagNetAddr = ":8085"
 	}
 	if flagDatabaseDsn == "" {
 		log.Fatalf("DatabaseDsn is not set, set flag -d or system variable DATABASE_URI")
