@@ -19,8 +19,8 @@ import (
 
 var (
 	accrualSystemAddress string
-	requestPeriod        time.Duration = 100 * time.Millisecond // период между итерациями отправки запросов к accrual
-	waitOrders           time.Duration = 100 * time.Millisecond // период ожидания поступления заказов в систему
+	requestPeriod        time.Duration = 500 * time.Millisecond // период между итерациями отправки запросов к accrual
+	waitOrders           time.Duration = 500 * time.Millisecond // период ожидания поступления заказов в систему
 )
 
 func SetAccrualSystemAddress(adress string) {
