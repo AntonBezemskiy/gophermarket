@@ -240,7 +240,8 @@ func TestGenerator(t *testing.T) {
 
 		m := mocks.NewMockOrdersInterface(ctrl)
 		m.EXPECT().GetOrdersForAccrual(gomock.Any()).Return(data, nil)
-		res, err := Generator(context.Background(), m)
+		client := resty.New()
+		res, err := Generator(context.Background(), client, m)
 		require.NoError(t, err)
 		// проверка, что все результаты работы Generator содержат статус 204
 		for _, r := range res {

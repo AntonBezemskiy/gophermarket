@@ -19,8 +19,8 @@ import (
 
 var (
 	accrualSystemAddress string
-	requestPeriod        time.Duration = 2 // период между итерациями отправки запросов к accrual
-	waitOrders           time.Duration = 2 // период ожидания поступления заказов в систему
+	requestPeriod        time.Duration = 100 * time.Millisecond // период между итерациями отправки запросов к accrual
+	waitOrders           time.Duration = 100 * time.Millisecond // период ожидания поступления заказов в систему
 )
 
 func SetAccrualSystemAddress(adress string) {
@@ -110,9 +110,7 @@ func Sender(jobs <-chan int64, results chan<- Result, adressAccrual string, clie
 }
 
 // создаю 10 воркеров, которые отправляют запросы к accrual для расчета баллов лояльности
-func Generator(ctx context.Context, stor repositories.OrdersInterface) ([]Result, error) {
-	// создаю нового клиента для каждой итерации отправки запросов к accrual
-	client := resty.New()
+func Generator(ctx context.Context, client *resty.Client, stor repositories.OrdersInterface) ([]Result, error) {
 
 	numbers, err := stor.GetOrdersForAccrual(ctx)
 	if err != nil {
@@ -155,6 +153,9 @@ func waitUntil(date time.Time) {
 }
 
 func UpdateAccrualData(ctx context.Context, stor repositories.OrdersInterface, retry repositories.RetryInterface) {
+	// создаю нового клиента для отправки запросов к accrual
+	client := resty.New()
+
 	for {
 		// Устанавливаю ожидание, если был превышен лимит обращений к accrual
 		waitPeriod, err := retry.GetRetryPeriod(ctx, "accrual")
@@ -174,14 +175,14 @@ func UpdateAccrualData(ctx context.Context, stor repositories.OrdersInterface, r
 			waitUntil(waitPeriod)
 		}
 
-		results, err := Generator(ctx, stor)
+		results, err := Generator(ctx, client, stor)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				// заказы для отравки в систему расчета баллов отсутствуют
 				// обрабатывать нечего, завершаю итерацию
 				logger.ServerLog.Debug("no data of orders", zap.String("function", "UpdateAccrualData"))
 				// ожидаю заказы
-				time.Sleep(waitOrders * time.Second)
+				time.Sleep(waitOrders)
 				continue
 			} else {
 				// ошибка сервиса
@@ -195,7 +196,7 @@ func UpdateAccrualData(ctx context.Context, stor repositories.OrdersInterface, r
 			// обрабатывать нечего, завершаю итерацию
 			logger.ServerLog.Debug("no data of orders", zap.String("function", "UpdateAccrualData"))
 			// ожидаю заказы
-			time.Sleep(waitOrders * time.Second)
+			time.Sleep(waitOrders)
 			continue
 		}
 		logger.ServerLog.Debug("have orders to request for accrual", zap.String("count", fmt.Sprintf("%d", len(results))))
@@ -234,6 +235,6 @@ func UpdateAccrualData(ctx context.Context, stor repositories.OrdersInterface, r
 
 		// ожидание между итерациями отправки запросов к accrual
 		//time.Sleep(GetRequestPeriod() * time.Second)
-		time.Sleep(requestPeriod * time.Second)
+		time.Sleep(requestPeriod)
 	}
 }
