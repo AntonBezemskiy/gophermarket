@@ -76,7 +76,7 @@ func TestGophermart(t *testing.T) {
 	// Запускаю сервис accrual--------------------------------------------------
 	accrualPort, err := getFreePort()
 	require.NoError(t, err)
-	accrualAdress := fmt.Sprintf(":%d", accrualPort)
+	accrualAdress := fmt.Sprintf("localhost:%d", accrualPort)
 	cmdAccrual := exec.Command("./../accrual/accrual_linux_amd64", fmt.Sprintf("-a=%s", accrualAdress))
 	// Связываем стандартный вывод и ошибки программы с выводом программы Go
 	cmdAccrual.Stdout = log.Writer()
@@ -95,7 +95,8 @@ func TestGophermart(t *testing.T) {
 	cleanBD(databaseDsn)
 
 	// Запускаю gophermart-----------------------------------------------------
-	cmdGophermart := exec.Command("./gophermart", fmt.Sprintf("-a=%s", gophermartAdress), fmt.Sprintf("-r=%s", accrualAdress), fmt.Sprintf("-d=%s", databaseDsn), "-l=debug")
+	cmdGophermart := exec.Command("./gophermart", fmt.Sprintf("-a=%s", gophermartAdress),
+		fmt.Sprintf("-r=%s", fmt.Sprintf("http://%s", accrualAdress)), fmt.Sprintf("-d=%s", databaseDsn), "-l=info")
 	// Связываем стандартный вывод и ошибки программы с выводом программы Go
 	cmdGophermart.Stdout = log.Writer()
 	cmdGophermart.Stderr = log.Writer()

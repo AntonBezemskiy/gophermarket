@@ -19,8 +19,8 @@ import (
 
 var (
 	accrualSystemAddress string
-	requestPeriod        time.Duration = 500 * time.Millisecond // период между итерациями отправки запросов к accrual
-	waitOrders           time.Duration = 500 * time.Millisecond // период ожидания поступления заказов в систему
+	requestPeriod        time.Duration = 100 * time.Millisecond // период между итерациями отправки запросов к accrual
+	waitOrders           time.Duration = 100 * time.Millisecond // период ожидания поступления заказов в систему
 )
 
 func SetAccrualSystemAddress(adress string) {
@@ -62,7 +62,7 @@ func Sender(jobs <-chan int64, results chan<- Result, adressAccrual string, clie
 	for num := range jobs {
 		// переменная для хранения результата работы Sender
 		var responce Result
-		url := fmt.Sprintf("http://%s/api/orders/%d", adressAccrual, num)
+		url := fmt.Sprintf("%s/api/orders/%d", adressAccrual, num)
 
 		resp, err := client.R().
 			SetHeader("Content-Type", "text/plain").
@@ -241,7 +241,6 @@ func UpdateAccrualData(ctx context.Context, stor repositories.OrdersInterface, r
 		}
 
 		// ожидание между итерациями отправки запросов к accrual
-		//time.Sleep(GetRequestPeriod() * time.Second)
 		time.Sleep(requestPeriod)
 	}
 }
