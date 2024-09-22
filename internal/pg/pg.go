@@ -285,7 +285,8 @@ func (s Store) Authenticate(ctx context.Context, login string, password string) 
 
 func (s Store) Load(ctx context.Context, idUser string, orderNumber string) (status int, err error) {
 	check := tools.LuhnCheck(orderNumber)
-	if !check {
+	// если номер заказа пустая строка или не пройден проверка по алгоритму Луна - неверный формат номера заказа
+	if orderNumber == "" || !check {
 		status = repositories.ORDERSCODE422
 		return
 	}
@@ -603,10 +604,10 @@ func (s Store) GetBalance(ctx context.Context, idUser string) (balance repositor
 
 // Запрос на списание средств. Так же в методе обновляется информация о выводе средств
 func (s Store) Withdraw(ctx context.Context, idUser string, orderNumber string, sum float64) (status int, err error) {
-	// Проверяю кооректность номера заказа. Номер заказа некорректный в случае если он не проходит проверку по алгоритму Луна
+	// Проверяю кооректность номера заказа. Номер заказа некорректный в случае если он не содержит значения, не проходит проверку по алгоритму Луна
 	// или если такой заказ уже существует в сервисе
 	check := tools.LuhnCheck(orderNumber)
-	if !check {
+	if orderNumber == "" || !check {
 		status = repositories.WITHDRAWCODE422
 		return
 	}

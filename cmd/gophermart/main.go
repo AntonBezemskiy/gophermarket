@@ -47,9 +47,6 @@ func main() {
 	}
 	// ------------------------------------------------------------------------------
 
-	// в целях дебага удаляю данные из базы
-	_ = stor.Disable(ctx)
-
 	if err := run(ctx, stor); err != nil {
 		log.Fatalf("Error starting server: %v\n", err)
 	}

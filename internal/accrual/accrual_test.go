@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -35,21 +37,38 @@ type Reward struct {
 }
 
 func TestSender(t *testing.T) {
+	// функция для получения свободного порта для запуска приложений
+	getFreePort := func() (int, error) {
+		// Слушаем на порту 0, чтобы операционная система выбрала свободный порт
+		listener, err := net.Listen("tcp", ":0")
+		if err != nil {
+			return 0, err
+		}
+		defer listener.Close()
+
+		// Получаем назначенный системой порт
+		port := listener.Addr().(*net.TCPAddr).Port
+		return port, nil
+	}
+
 	// Запускаем программу
-	cmd := exec.Command("./../../cmd/accrual/accrual_linux_amd64", "-a=:8081")
+	accrualPort, err := getFreePort()
+	require.NoError(t, err)
+	accrulaAdress := fmt.Sprintf(":%d", accrualPort)
+	cmd := exec.Command("./../../cmd/accrual/accrual_linux_amd64", fmt.Sprintf("-a=%s", accrulaAdress))
 
 	// Связываем стандартный вывод и ошибки программы с выводом программы Go
 	cmd.Stdout = log.Writer()
 	cmd.Stderr = log.Writer()
 
 	// Запуск программы
-	err := cmd.Start()
+	err = cmd.Start()
 	require.NoError(t, err)
 	time.Sleep(2 * time.Second) // Ждем 2 секунды для запуска сервиса
 
 	// Запуск тестов------------------------------------
 	// устанавливаю адрес доступа к системе accrual
-	SetAccrualSystemAddress(":8081")
+	SetAccrualSystemAddress(accrulaAdress)
 
 	// тест с кодом 204: заказ не зарегистрирован в системе расчёта
 	{
@@ -78,7 +97,7 @@ func TestSender(t *testing.T) {
 			Goods: []Good{
 				{
 					Description: "First thing",
-					Price:       500.1,
+					Price:       500,
 				},
 			},
 		}
@@ -91,7 +110,7 @@ func TestSender(t *testing.T) {
 		resp, err := client.R().
 			SetHeader("Content-Type", "application/json").
 			SetBody(b.Bytes()).
-			Post("http://localhost:8081/api/orders")
+			Post(fmt.Sprintf("http://%s/api/orders", accrulaAdress))
 		require.NoError(t, err)
 		assert.Equal(t, 202, resp.StatusCode())
 
@@ -127,7 +146,7 @@ func TestSender(t *testing.T) {
 		resp, err := client.R().
 			SetHeader("Content-Type", "application/json").
 			SetBody(r.Bytes()).
-			Post("http://localhost:8081/api/goods")
+			Post(fmt.Sprintf("http://%s/api/goods", accrulaAdress))
 		require.NoError(t, err)
 		assert.Equal(t, 200, resp.StatusCode())
 
@@ -137,7 +156,7 @@ func TestSender(t *testing.T) {
 			Goods: []Good{
 				{
 					Description: "Laptop Asus",
-					Price:       100500,
+					Price:       100500.1,
 				},
 			},
 		}
@@ -150,7 +169,7 @@ func TestSender(t *testing.T) {
 		resp, err = client.R().
 			SetHeader("Content-Type", "application/json").
 			SetBody(b.Bytes()).
-			Post("http://localhost:8081/api/orders")
+			Post(fmt.Sprintf("http://%s/api/orders", accrulaAdress))
 		require.NoError(t, err)
 		assert.Equal(t, 202, resp.StatusCode())
 
@@ -174,24 +193,43 @@ func TestSender(t *testing.T) {
 	// Останавливаем процесс
 	err = cmd.Process.Signal(os.Interrupt) // Посылаем сигнал прерывания
 	require.NoError(t, err)
+	time.Sleep(time.Second)
 }
 
 func TestGenerator(t *testing.T) {
+	// функция для получения свободного порта для запуска приложений
+	getFreePort := func() (int, error) {
+		// Слушаем на порту 0, чтобы операционная система выбрала свободный порт
+		listener, err := net.Listen("tcp", ":0")
+		if err != nil {
+			return 0, err
+		}
+		defer listener.Close()
+
+		// Получаем назначенный системой порт
+		port := listener.Addr().(*net.TCPAddr).Port
+		return port, nil
+	}
+
 	// Запускаем программу
-	cmd := exec.Command("./../../cmd/accrual/accrual_linux_amd64", "-a=:8081")
+	accrualPort, err := getFreePort()
+	require.NoError(t, err)
+	accrulaAdress := fmt.Sprintf(":%d", accrualPort)
+
+	cmd := exec.Command("./../../cmd/accrual/accrual_linux_amd64", fmt.Sprintf("-a=%s", accrulaAdress))
 
 	// Связываем стандартный вывод и ошибки программы с выводом программы Go
 	cmd.Stdout = log.Writer()
 	cmd.Stderr = log.Writer()
 
 	// Запуск программы
-	err := cmd.Start()
+	err = cmd.Start()
 	require.NoError(t, err)
 	time.Sleep(2 * time.Second) // Ждем 2 секунды для запуска сервиса
 
 	// Запуск тестов------------------------------------
 	// устанавливаю адрес доступа к системе accrual
-	SetAccrualSystemAddress(":8081")
+	SetAccrualSystemAddress(accrulaAdress)
 
 	// тест с кодом 204: заказ не зарегистрирован в системе расчёта
 	{
@@ -213,4 +251,5 @@ func TestGenerator(t *testing.T) {
 	// Останавливаем процесс
 	err = cmd.Process.Signal(os.Interrupt) // Посылаем сигнал прерывания
 	require.NoError(t, err)
+	time.Sleep(time.Second)
 }

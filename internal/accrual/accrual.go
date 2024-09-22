@@ -19,8 +19,8 @@ import (
 
 var (
 	accrualSystemAddress string
-	requestPeriod        time.Duration     // период между итерациями отправки запросов к accrual
-	waitOrders           time.Duration = 5 // период ожидания поступления заказов в систему
+	requestPeriod        time.Duration = 2 // период между итерациями отправки запросов к accrual
+	waitOrders           time.Duration = 2 // период ожидания поступления заказов в систему
 )
 
 func SetAccrualSystemAddress(adress string) {
@@ -221,16 +221,19 @@ func UpdateAccrualData(ctx context.Context, stor repositories.OrdersInterface, r
 				logger.ServerLog.Error("internal error", zap.String("error", err.Error()))
 			}
 			// обработка кода 200 от accrual
-			if result.requestStatus == http.StatusNoContent {
+			if result.requestStatus == http.StatusOK {
 				// накапливаю данные для обновления заказов в рамках единой транзакции
 				accrualData = append(accrualData, repositories.AccrualData{Order: result.Order, Status: result.Status, Accrual: result.Accrual})
 			}
 		}
 		// обновляю информацию в заказах
 		err = stor.UpdateOrderTX(ctx, accrualData)
-		logger.ServerLog.Error("get error in UpdateOrderTX", zap.String("error", err.Error()))
+		if err != nil {
+			logger.ServerLog.Error("fail to update data in gophermart", zap.String("error", err.Error()))
+		}
 
 		// ожидание между итерациями отправки запросов к accrual
-		time.Sleep(GetRequestPeriod() * time.Second)
+		//time.Sleep(GetRequestPeriod() * time.Second)
+		time.Sleep(requestPeriod * time.Second)
 	}
 }
