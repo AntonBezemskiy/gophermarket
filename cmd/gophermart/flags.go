@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"log"
 	"os"
 
 	"github.com/AntonBezemskiy/gophermart/internal/accrual"
@@ -55,13 +56,13 @@ func parseFlags() {
 		flagNetAddr = ":8080"
 	}
 	if flagDatabaseDsn == "" {
-		flagDatabaseDsn = ""
+		log.Fatalf("DatabaseDsn is not set, set flag -d or system variable DATABASE_URI")
 	}
 	if flagAccrualSystemAddress == "" {
 		flagAccrualSystemAddress = ":8081"
 	}
 	if flagLogLevel == "" {
-		flagLogLevel = "info"
+		flagLogLevel = "debug"
 	}
 
 	// устанавливаю глобальные переменные полученными значениями

@@ -116,6 +116,11 @@ func Generator(ctx context.Context, client *resty.Client, stor repositories.Orde
 	if err != nil {
 		return nil, err
 	}
+	logger.ServerLog.Debug(fmt.Sprintf("have %d orders to update in accrual", len(numbers)))
+	// заказов для обновления данных в системе accrual нет
+	if len(numbers) == 0 {
+		return make([]Result, 0), nil
+	}
 
 	// устанавливаю количество запросов
 	numJobs := len(numbers)
@@ -227,10 +232,12 @@ func UpdateAccrualData(ctx context.Context, stor repositories.OrdersInterface, r
 				accrualData = append(accrualData, repositories.AccrualData{Order: result.Order, Status: result.Status, Accrual: result.Accrual})
 			}
 		}
-		// обновляю информацию в заказах
-		err = stor.UpdateOrderTX(ctx, accrualData)
-		if err != nil {
-			logger.ServerLog.Error("fail to update data in gophermart", zap.String("error", err.Error()))
+		// обновляю информацию в заказах в случае если есть данные для обновления
+		if len(accrualData) > 0 {
+			err = stor.UpdateOrderTX(ctx, accrualData)
+			if err != nil {
+				logger.ServerLog.Error("fail to update data in gophermart", zap.String("error", err.Error()))
+			}
 		}
 
 		// ожидание между итерациями отправки запросов к accrual

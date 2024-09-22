@@ -504,6 +504,12 @@ func (s Store) UpdateOrder(ctx context.Context, orderNumber string, status strin
 
 // обновляю инофрмацию в заказах транзакцией
 func (s Store) UpdateOrderTX(ctx context.Context, dataSlice []repositories.AccrualData) error {
+	if dataSlice == nil {
+		return fmt.Errorf("slice data to update is nill")
+	}
+	if len(dataSlice) == 0 {
+		return nil
+	}
 	tx, err := s.conn.BeginTx(ctx, nil)
 	if err != nil {
 		return err
