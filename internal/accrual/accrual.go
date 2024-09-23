@@ -111,6 +111,13 @@ func Sender(jobs <-chan int64, results chan<- Result, adressAccrual string, clie
 
 // создаю 10 воркеров, которые отправляют запросы к accrual для расчета баллов лояльности
 func Generator(ctx context.Context, client *resty.Client, stor repositories.OrdersInterface) ([]Result, error) {
+	// Проверка отмены контекста
+	select {
+	case <-ctx.Done():
+		return make([]Result, 0), ctx.Err() 
+	default:
+		// Контекст ещё не отменен, можно продолжить выполнение
+	}
 
 	numbers, err := stor.GetOrdersForAccrual(ctx)
 	if err != nil {
@@ -162,6 +169,14 @@ func UpdateAccrualData(ctx context.Context, stor repositories.OrdersInterface, r
 	client := resty.New()
 
 	for {
+		// Проверка отмены контекста
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			// Контекст ещё не отменен, можно продолжить выполнение
+		}
+
 		// Устанавливаю ожидание, если был превышен лимит обращений к accrual
 		waitPeriod, err := retry.GetRetryPeriod(ctx, "accrual")
 		if err != nil {

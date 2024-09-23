@@ -5,16 +5,23 @@ import (
 	"database/sql"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/AntonBezemskiy/gophermart/internal/accrual"
 	"github.com/AntonBezemskiy/gophermart/internal/auth"
 	"github.com/AntonBezemskiy/gophermart/internal/handlers"
 	"github.com/AntonBezemskiy/gophermart/internal/logger"
 	"github.com/AntonBezemskiy/gophermart/internal/pg"
+	"github.com/AntonBezemskiy/gophermart/internal/requesttracker"
 	"github.com/go-chi/chi/v5"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"go.uber.org/zap"
 )
+
+const shutdownWaitPeriod = 20 * time.Second // для установки в контекст для реализаации graceful shutdown
 
 func main() {
 	parseFlags()
@@ -47,38 +54,69 @@ func main() {
 	}
 	// ------------------------------------------------------------------------------
 
-	if err := run(ctx, stor); err != nil {
-		log.Fatalf("Error starting server: %v\n", err)
-	}
+	run(ctx, stor)
 }
 
 // функция run будет необходима для инициализации зависимостей сервера перед запуском
-func run(ctx context.Context, stor *pg.Store) error {
+func run(ctx context.Context, stor *pg.Store) {
+	// Инициализация логера
 	if err := logger.Initialize(logLevel); err != nil {
-		return err
+		log.Fatalf("Error starting server: %v", err)
 	}
 
 	logger.ServerLog.Info("Running gophermart", zap.String("address", netAddr))
 	// запускаю отправку запросов к системе расчета баллов accrual в отдельной горутине
 	go accrual.UpdateAccrualData(ctx, stor, stor)
-	// запускаю сам сервис
-	return http.ListenAndServe(netAddr, MetricRouter(stor))
+
+	// запускаю сам сервис с проверкой отмены контекста для реализации graceful shutdown--------------
+	srv := &http.Server{
+		Addr:    ":8080",
+		Handler: MetricRouter(stor),
+	}
+	// Канал для получения сигнала прерывания
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	// Горутина для запуска сервера
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Error starting server: %v", err)
+		}
+	}()
+
+	// Блокирование до тех пор, пока не поступит сигнал о прерывании
+	<-quit
+	log.Println("Shutting down server...")
+
+	// Create a context with timeout for graceful shutdown
+	ctx, cancel := context.WithTimeout(context.Background(), shutdownWaitPeriod)
+	defer cancel()
+
+	// останавливаю сервер, чтобы он перестал принимать новые запросы
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Fatalf("Stopping server error: %v", err)
+	}
+	// ожидаю завершения всех активных запросов
+	// дополнительный слой защиты и способ отслеживания количества активных запросов на момент поступления сигнала о завершении работы сервера
+	requesttracker.WaitForActiveRequests(ctx)
+
+	log.Println("Shutdown the server gracefully")
 }
 
 func MetricRouter(stor *pg.Store) chi.Router {
 	r := chi.NewRouter()
 
 	r.Route("/api/user", func(r chi.Router) {
-		r.Post("/register", logger.RequestLogger(handlers.RegisterHandler(stor)))
-		r.Post("/login", logger.RequestLogger(handlers.AuthenticationHandler(stor)))
-		r.Post("/orders", logger.RequestLogger(auth.Checker(handlers.LoadOrdersHandler(stor))))
-		r.Get("/orders", logger.RequestLogger(auth.Checker(handlers.GetOrdersHandler(stor))))
+		r.Post("/register", logger.RequestLogger(requesttracker.WithActiveRequests(handlers.RegisterHandler(stor))))
+		r.Post("/login", logger.RequestLogger(requesttracker.WithActiveRequests(handlers.AuthenticationHandler(stor))))
+		r.Post("/orders", logger.RequestLogger(requesttracker.WithActiveRequests(auth.Checker(handlers.LoadOrdersHandler(stor)))))
+		r.Get("/orders", logger.RequestLogger(requesttracker.WithActiveRequests(auth.Checker(handlers.GetOrdersHandler(stor)))))
 
 		r.Route("/balance", func(r chi.Router) {
-			r.Get("/", logger.RequestLogger(auth.Checker(handlers.GetBalanceHandler(stor))))
-			r.Post("/withdraw", logger.RequestLogger(auth.Checker(handlers.WithdrawHandler(stor))))
+			r.Get("/", logger.RequestLogger(requesttracker.WithActiveRequests(auth.Checker(handlers.GetBalanceHandler(stor)))))
+			r.Post("/withdraw", logger.RequestLogger(requesttracker.WithActiveRequests(auth.Checker(handlers.WithdrawHandler(stor)))))
 		})
-		r.Get("/withdrawals", logger.RequestLogger(auth.Checker(handlers.WithdrawalsHandler(stor))))
+		r.Get("/withdrawals", logger.RequestLogger(requesttracker.WithActiveRequests(auth.Checker(handlers.WithdrawalsHandler(stor)))))
 	})
 
 	// Определяем маршрут по умолчанию для некорректных запросов
