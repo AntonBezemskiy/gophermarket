@@ -26,14 +26,6 @@ func NewStore(conn *sql.DB) *Store {
 }
 
 func (s Store) Bootstrap(ctx context.Context) (err error) {
-	// Проверка отмены контекста
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	default:
-		// Контекст ещё не отменен, можно продолжить выполнение
-	}
-
 	// запускаем транзакцию
 	tx, err := s.conn.BeginTx(ctx, nil)
 	if err != nil {
@@ -126,14 +118,6 @@ func (s Store) Bootstrap(ctx context.Context) (err error) {
 // Disable очищает БД, удаляя записи из таблиц
 // необходима для тестирования, чтобы в процессе удалять тестовые записи
 func (s Store) Disable(ctx context.Context) (err error) {
-	// Проверка отмены контекста
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	default:
-		// Контекст ещё не отменен, можно продолжить выполнение
-	}
-
 	logger.ServerLog.Debug("truncate all data in all tables")
 
 	// запускаем транзакцию
@@ -191,15 +175,6 @@ func (s Store) Disable(ctx context.Context) (err error) {
 
 // Регистрация пользователя в системе. Создаю таблицу с учетными данными пользователя, а так-же таблицу с балансом пользователя
 func (s Store) Register(ctx context.Context, login string, password string) (status int, token string, err error) {
-	// Проверка отмены контекста
-	select {
-	case <-ctx.Done():
-		err = ctx.Err()
-		return
-	default:
-		// Контекст ещё не отменен, можно продолжить выполнение
-	}
-
 	// проверка валидности логина и пароля
 	// в случае неверных данных возвращается http.StatusBadRequest
 	if login == "" || password == "" {
@@ -269,15 +244,6 @@ func (s Store) Register(ctx context.Context, login string, password string) (sta
 }
 
 func (s Store) Authenticate(ctx context.Context, login string, password string) (status int, token string, err error) {
-	// Проверка отмены контекста
-	select {
-	case <-ctx.Done():
-		err = ctx.Err()
-		return
-	default:
-		// Контекст ещё не отменен, можно продолжить выполнение
-	}
-
 	// проверка валидности логина и пароля
 	// в случае неверных данных возвращается http.StatusBadRequest
 	if login == "" || password == "" {
@@ -318,15 +284,6 @@ func (s Store) Authenticate(ctx context.Context, login string, password string) 
 }
 
 func (s Store) Load(ctx context.Context, idUser string, orderNumber string) (status int, err error) {
-	// Проверка отмены контекста
-	select {
-	case <-ctx.Done():
-		err = ctx.Err()
-		return
-	default:
-		// Контекст ещё не отменен, можно продолжить выполнение
-	}
-
 	check := tools.LuhnCheck(orderNumber)
 	// если номер заказа пустая строка или не пройден проверка по алгоритму Луна - неверный формат номера заказа
 	if orderNumber == "" || !check {
@@ -385,15 +342,6 @@ func (s Store) Load(ctx context.Context, idUser string, orderNumber string) (sta
 }
 
 func (s Store) GetOrders(ctx context.Context, idUser string) (orders []repositories.Order, status int, err error) {
-	// Проверка отмены контекста
-	select {
-	case <-ctx.Done():
-		err = ctx.Err()
-		return
-	default:
-		// Контекст ещё не отменен, можно продолжить выполнение
-	}
-
 	orders = make([]repositories.Order, 0)
 
 	// выгружаю все заказы, которые соответствуют данному польззователя. Сортировка по времени от самых новых к самым старым заказам
@@ -446,14 +394,6 @@ func (s Store) GetOrders(ctx context.Context, idUser string) (orders []repositor
 
 // Метод для получения id пользователя, который загрузил данный заказ
 func (s Store) GetIDByOrderNumber(ctx context.Context, orderNumber string) (string, error) {
-	// Проверка отмены контекста
-	select {
-	case <-ctx.Done():
-		return "", ctx.Err()
-	default:
-		// Контекст ещё не отменен, можно продолжить выполнение
-	}
-
 	// Преобразую номер заказа из строки в int64
 	orderNumberInt, err := strconv.ParseInt(orderNumber, 10, 64)
 	if err != nil {
@@ -484,14 +424,6 @@ func (s Store) GetIDByOrderNumber(ctx context.Context, orderNumber string) (stri
 
 // Обновляет баланс пользователя по номеру заказа и сумме начисленных баллов
 func (s Store) UpdateBalance(ctx context.Context, orderNumber string, accrual float64) error {
-	// Проверка отмены контекста
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	default:
-		// Контекст ещё не отменен, можно продолжить выполнение
-	}
-
 	// Преобразую номер заказа из строки в int64
 	orderNumberInt, err := strconv.ParseInt(orderNumber, 10, 64)
 	if err != nil {
@@ -530,14 +462,6 @@ func (s Store) UpdateBalance(ctx context.Context, orderNumber string, accrual fl
 
 // обновляю инофрмацию в заказах. Так же в случае начисления баллов обновляю баланс пользователя
 func (s Store) UpdateOrder(ctx context.Context, orderNumber string, status string, accrual float64) error {
-	// Проверка отмены контекста
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	default:
-		// Контекст ещё не отменен, можно продолжить выполнение
-	}
-
 	tx, err := s.conn.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -580,14 +504,6 @@ func (s Store) UpdateOrder(ctx context.Context, orderNumber string, status strin
 
 // обновляю инофрмацию в заказах транзакцией
 func (s Store) UpdateOrderTX(ctx context.Context, dataSlice []repositories.AccrualData) error {
-	// Проверка отмены контекста
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	default:
-		// Контекст ещё не отменен, можно продолжить выполнение
-	}
-
 	if dataSlice == nil {
 		return fmt.Errorf("slice data to update is nill")
 	}
@@ -639,14 +555,6 @@ func (s Store) UpdateOrderTX(ctx context.Context, dataSlice []repositories.Accru
 
 // выгружаю номера заказов для которых необходимо получить баллы лояльности
 func (s Store) GetOrdersForAccrual(ctx context.Context) (numbers []int64, err error) {
-	// Проверка отмены контекста
-	select {
-	case <-ctx.Done():
-		err = ctx.Err()
-	default:
-		// Контекст ещё не отменен, можно продолжить выполнение
-	}
-
 	numbers = make([]int64, 0)
 
 	// выгружаю все заказы со статусами NEW и PROCESSING. Сортировка по времени от самых старых к самым новым заказам
@@ -683,15 +591,6 @@ func (s Store) GetOrdersForAccrual(ctx context.Context) (numbers []int64, err er
 }
 
 func (s Store) GetBalance(ctx context.Context, idUser string) (balance repositories.Balance, err error) {
-	// Проверка отмены контекста
-	select {
-	case <-ctx.Done():
-		err = ctx.Err()
-		return
-	default:
-		// Контекст ещё не отменен, можно продолжить выполнение
-	}
-
 	query := `
 		SELECT
 			current,
@@ -711,15 +610,6 @@ func (s Store) GetBalance(ctx context.Context, idUser string) (balance repositor
 
 // Запрос на списание средств. Так же в методе обновляется информация о выводе средств
 func (s Store) Withdraw(ctx context.Context, idUser string, orderNumber string, sum float64) (status int, err error) {
-	// Проверка отмены контекста
-	select {
-	case <-ctx.Done():
-		err = ctx.Err()
-		return
-	default:
-		// Контекст ещё не отменен, можно продолжить выполнение
-	}
-
 	// Проверяю кооректность номера заказа. Номер заказа некорректный в случае если он не содержит значения, не проходит проверку по алгоритму Луна
 	// или если такой заказ уже существует в сервисе
 	check := tools.LuhnCheck(orderNumber)
@@ -813,15 +703,6 @@ func (s Store) Withdraw(ctx context.Context, idUser string, orderNumber string, 
 }
 
 func (s Store) GetWithdrawals(ctx context.Context, idUser string) (withdrawals []repositories.Withdrawals, status int, err error) {
-	// Проверка отмены контекста
-	select {
-	case <-ctx.Done():
-		err = ctx.Err()
-		return
-	default:
-		// Контекст ещё не отменен, можно продолжить выполнение
-	}
-
 	withdrawals = make([]repositories.Withdrawals, 0)
 
 	// получаю записи о выводе средств для данного пользователя
@@ -872,14 +753,6 @@ func (s Store) GetWithdrawals(ctx context.Context, idUser string) (withdrawals [
 
 // устанавливаю период ожидания для определенного сервиса
 func (s Store) AddRetryPeriod(ctx context.Context, service string, period time.Time) error {
-	// Проверка отмены контекста
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	default:
-		// Контекст ещё не отменен, можно продолжить выполнение
-	}
-
 	// добавляю запись в таблицу с информацией о выводе средств
 	insertPeriod := `
 				INSERT INTO wait (service, period)
@@ -896,14 +769,6 @@ func (s Store) AddRetryPeriod(ctx context.Context, service string, period time.T
 
 // получаю период ожидания для определенного сервиса
 func (s Store) GetRetryPeriod(ctx context.Context, service string) (time.Time, error) {
-	// Проверка отмены контекста
-	select {
-	case <-ctx.Done():
-		return time.Now(), ctx.Err()
-	default:
-		// Контекст ещё не отменен, можно продолжить выполнение
-	}
-
 	query := `
 		SELECT
 			period
