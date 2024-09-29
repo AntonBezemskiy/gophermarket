@@ -3,6 +3,7 @@ package pg
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -194,7 +195,7 @@ func (s Store) Register(ctx context.Context, login string, password string) (sta
 	var checkUniqueOfLoggin string
 	err = row.Scan(&checkUniqueOfLoggin)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			// логин уникален, продолжаем регистрацию
 			logger.ServerLog.Debug("user is unique, continue registration process", zap.String("login", login), zap.String("password", password))
 			err = nil
