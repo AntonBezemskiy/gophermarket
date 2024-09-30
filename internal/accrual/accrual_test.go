@@ -237,7 +237,7 @@ func TestGenerator(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		m := mocks.NewMockOrdersInterface(ctrl)
+		m := mocks.NewMockOrderManager(ctrl)
 		m.EXPECT().GetOrdersForAccrual(gomock.Any()).Return(data, nil)
 		client := resty.New()
 		res, err := Generator(context.Background(), client, m)

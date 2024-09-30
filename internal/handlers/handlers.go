@@ -17,7 +17,7 @@ func NotFound(res http.ResponseWriter, req *http.Request) {
 }
 
 // Регистрация пользователя
-func Register(res http.ResponseWriter, req *http.Request, regist repositories.AuthInterface) {
+func Register(res http.ResponseWriter, req *http.Request, regist repositories.Authenticator) {
 	res.Header().Set("Content-Type", "text/plain")
 	defer req.Body.Close()
 
@@ -57,7 +57,7 @@ func Register(res http.ResponseWriter, req *http.Request, regist repositories.Au
 }
 
 // Аутентификация пользователя
-func Authentication(res http.ResponseWriter, req *http.Request, authRep repositories.AuthInterface) {
+func Authentication(res http.ResponseWriter, req *http.Request, authRep repositories.Authenticator) {
 	res.Header().Set("Content-Type", "text/plain")
 	defer req.Body.Close()
 
@@ -96,7 +96,7 @@ func Authentication(res http.ResponseWriter, req *http.Request, authRep reposito
 }
 
 // Загрузка заказа в сервис
-func LoadOrders(res http.ResponseWriter, req *http.Request, order repositories.OrdersInterface) {
+func LoadOrders(res http.ResponseWriter, req *http.Request, order repositories.OrderManager) {
 	// Получаю id пользователя из контекста
 	id, ok := req.Context().Value(auth.UserIDKey).(string)
 	if !ok {
@@ -143,7 +143,7 @@ func LoadOrders(res http.ResponseWriter, req *http.Request, order repositories.O
 }
 
 // Выгрузка списка заказов пользователя отсортированных по времени загрузки
-func GetOrders(res http.ResponseWriter, req *http.Request, order repositories.OrdersInterface) {
+func GetOrders(res http.ResponseWriter, req *http.Request, order repositories.OrderManager) {
 	// Получаю id пользователя из контекста
 	id, ok := req.Context().Value(auth.UserIDKey).(string)
 	if !ok {
@@ -184,7 +184,7 @@ func GetOrders(res http.ResponseWriter, req *http.Request, order repositories.Or
 }
 
 // Получение баланса пользователя
-func GetBalance(res http.ResponseWriter, req *http.Request, blnc repositories.BalanceInterface) {
+func GetBalance(res http.ResponseWriter, req *http.Request, blnc repositories.BalanceManager) {
 	// Получаю id пользователя из контекста
 	id, ok := req.Context().Value(auth.UserIDKey).(string)
 	if !ok {
@@ -215,7 +215,7 @@ func GetBalance(res http.ResponseWriter, req *http.Request, blnc repositories.Ba
 }
 
 // Запрос на списание средств
-func Withdraw(res http.ResponseWriter, req *http.Request, wthdrw repositories.WithdrawInterface) {
+func Withdraw(res http.ResponseWriter, req *http.Request, wthdrw repositories.WithdrawHandler) {
 	// Получаю id пользователя из контекста
 	id, ok := req.Context().Value(auth.UserIDKey).(string)
 	if !ok {
@@ -258,7 +258,7 @@ func Withdraw(res http.ResponseWriter, req *http.Request, wthdrw repositories.Wi
 	}
 }
 
-func Withdrawals(res http.ResponseWriter, req *http.Request, wthdrwls repositories.WithdrawalsInterface) {
+func Withdrawals(res http.ResponseWriter, req *http.Request, wthdrwls repositories.WithdrawalsHandler) {
 	// Получаю id пользователя из контекста
 	id, ok := req.Context().Value(auth.UserIDKey).(string)
 	if !ok {
@@ -304,49 +304,49 @@ func NotFoundHandler() http.HandlerFunc {
 	return fn
 }
 
-func RegisterHandler(regist repositories.AuthInterface) http.HandlerFunc {
+func RegisterHandler(regist repositories.Authenticator) http.HandlerFunc {
 	fn := func(res http.ResponseWriter, req *http.Request) {
 		Register(res, req, regist)
 	}
 	return fn
 }
 
-func AuthenticationHandler(regist repositories.AuthInterface) http.HandlerFunc {
+func AuthenticationHandler(regist repositories.Authenticator) http.HandlerFunc {
 	fn := func(res http.ResponseWriter, req *http.Request) {
 		Authentication(res, req, regist)
 	}
 	return fn
 }
 
-func LoadOrdersHandler(order repositories.OrdersInterface) http.HandlerFunc {
+func LoadOrdersHandler(order repositories.OrderManager) http.HandlerFunc {
 	fn := func(res http.ResponseWriter, req *http.Request) {
 		LoadOrders(res, req, order)
 	}
 	return fn
 }
 
-func GetOrdersHandler(order repositories.OrdersInterface) http.HandlerFunc {
+func GetOrdersHandler(order repositories.OrderManager) http.HandlerFunc {
 	fn := func(res http.ResponseWriter, req *http.Request) {
 		GetOrders(res, req, order)
 	}
 	return fn
 }
 
-func GetBalanceHandler(balance repositories.BalanceInterface) http.HandlerFunc {
+func GetBalanceHandler(balance repositories.BalanceManager) http.HandlerFunc {
 	fn := func(res http.ResponseWriter, req *http.Request) {
 		GetBalance(res, req, balance)
 	}
 	return fn
 }
 
-func WithdrawHandler(withdraw repositories.WithdrawInterface) http.HandlerFunc {
+func WithdrawHandler(withdraw repositories.WithdrawHandler) http.HandlerFunc {
 	fn := func(res http.ResponseWriter, req *http.Request) {
 		Withdraw(res, req, withdraw)
 	}
 	return fn
 }
 
-func WithdrawalsHandler(wthdrwls repositories.WithdrawalsInterface) http.HandlerFunc {
+func WithdrawalsHandler(wthdrwls repositories.WithdrawalsHandler) http.HandlerFunc {
 	fn := func(res http.ResponseWriter, req *http.Request) {
 		Withdrawals(res, req, wthdrwls)
 	}

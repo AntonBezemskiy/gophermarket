@@ -110,7 +110,7 @@ func Sender(jobs <-chan int64, results chan<- Result, adressAccrual string, clie
 }
 
 // создаю 10 воркеров, которые отправляют запросы к accrual для расчета баллов лояльности
-func Generator(ctx context.Context, client *resty.Client, stor repositories.OrdersInterface) ([]Result, error) {
+func Generator(ctx context.Context, client *resty.Client, stor repositories.OrderManager) ([]Result, error) {
 	// Проверка отмены контекста
 	select {
 	case <-ctx.Done():
@@ -164,7 +164,7 @@ func waitUntil(date time.Time) {
 	}
 }
 
-func UpdateAccrualData(ctx context.Context, stor repositories.OrdersInterface, retry repositories.RetryInterface) {
+func UpdateAccrualData(ctx context.Context, stor repositories.OrderManager, retry repositories.RetryHandler) {
 	// создаю нового клиента для отправки запросов к accrual
 	client := resty.New()
 

@@ -79,7 +79,7 @@ func TestRegister(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		m := mocks.NewMockAuthInterface(ctrl)
+		m := mocks.NewMockAuthenticator(ctrl)
 
 		// тестовый случай с кодом 200---------------------------------------------------------
 		// Создаю тело запроса с логином и паролем пользователя
@@ -309,7 +309,7 @@ func TestAuthentication(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		m := mocks.NewMockAuthInterface(ctrl)
+		m := mocks.NewMockAuthenticator(ctrl)
 
 		// тестовый случай с кодом 200---------------------------------------------------------
 		// Создаю тело запроса с логином и паролем пользователя
@@ -539,7 +539,7 @@ func TestLoadOrders(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		m := mocks.NewMockOrdersInterface(ctrl)
+		m := mocks.NewMockOrderManager(ctrl)
 
 		// тестовый случай с кодом 200--------------------------------------------------------
 		m.EXPECT().Load(gomock.Any(), gomock.Any(), "succes order number, code 200").Return(200, nil)
@@ -738,7 +738,7 @@ func TestGetOrders(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		m := mocks.NewMockOrdersInterface(ctrl)
+		m := mocks.NewMockOrderManager(ctrl)
 
 		// тестовый случай с кодом 200--------------------------------------------------------
 		loadT := time.Date(2003, time.May, 1, 17, 1, 21, 0, time.UTC)
@@ -941,7 +941,7 @@ func TestGetBalance(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		m := mocks.NewMockBalanceInterface(ctrl)
+		m := mocks.NewMockBalanceManager(ctrl)
 
 		// тестовый случай с кодом 200--------------------------------------------------------
 		balance := repositories.Balance{
@@ -1098,7 +1098,7 @@ func TestWithdraw(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		m := mocks.NewMockWithdrawInterface(ctrl)
+		m := mocks.NewMockWithdrawHandler(ctrl)
 
 		// тестовый случай с кодом 200--------------------------------------------------------
 		withdraw200 := repositories.WithdrawRequest{
@@ -1214,7 +1214,7 @@ func TestWithdrawals(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		m := mocks.NewMockWithdrawalsInterface(ctrl)
+		m := mocks.NewMockWithdrawalsHandler(ctrl)
 
 		// тестовый случай с кодом 200--------------------------------------------------------
 		loadT := time.Date(2003, time.May, 1, 17, 1, 21, 0, time.UTC)

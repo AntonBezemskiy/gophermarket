@@ -25,7 +25,7 @@ const (
 	LOGINWRONGLOGINORPASSWORD
 )
 
-type AuthInterface interface {
+type Authenticator interface {
 	Register(ctx context.Context, login string, password string) (status int, token string, err error)     // return values is Ok, token and error. Ok is false when login of user is not unique
 	Authenticate(ctx context.Context, login string, password string) (status int, token string, err error) // return values is Ok, token and error. Ok is false when login or password of user is wrong
 }
@@ -69,7 +69,7 @@ type AccrualData struct {
 	Accrual float64 `json:"accrual,omitempty"` // статус расчёта начисления
 }
 
-type OrdersInterface interface {
+type OrderManager interface {
 	Load(ctx context.Context, idUser string, orderNumber string) (status int, err error)       // load order in storage. Gets context, id of user, order number of user. Returns different status codes and posible error
 	GetOrders(ctx context.Context, idUser string) (orders []Order, status int, err error)      // get list of orders. List is sortied by data of loading. Gets context, id of user. Returns list, status and error
 	GetOrdersForAccrual(ctx context.Context) (numbers []int64, err error)                      // return numbers of all orders with NEW and PROCESSING status
@@ -84,7 +84,7 @@ type Balance struct {
 	Withdrawn float64 `json:"withdrawn"` // сумма использованных баллов за весь период регистрации
 }
 
-type BalanceInterface interface {
+type BalanceManager interface {
 	GetBalance(ctx context.Context, idUser string) (balance Balance, err error) // For getting current balance of user. Gets context, id of user. Returns balance and error.
 }
 
@@ -101,7 +101,7 @@ type WithdrawRequest struct {
 	Sum   float64 `json:"sum"`   // сумма баллов к списанию в счёт оплаты
 }
 
-type WithdrawInterface interface {
+type WithdrawHandler interface {
 	Withdraw(ctx context.Context, idUser string, orderNumber string, sum float64) (status int, err error) // request for withdrawal of funds. Gets context, id of user, order number of user, sum to withdraw. Return code and error.
 }
 
@@ -117,13 +117,13 @@ type Withdrawals struct {
 	ProcessAt time.Time `json:"processed_at"` // дата вывода средств
 }
 
-type WithdrawalsInterface interface {
+type WithdrawalsHandler interface {
 	GetWithdrawals(ctx context.Context, idUser string) (withdrawals []Withdrawals, status int, err error) // get information about withdrawals. Gets context, id of user. Return list of withdrawals, status and error
 }
 
 // ------------------------------------------------------------------------------------------------------
 
-type RetryInterface interface {
+type RetryHandler interface {
 	AddRetryPeriod(ctx context.Context, service string, period time.Time) error // set period time of waiting for requesting to particular service
 	GetRetryPeriod(ctx context.Context, service string) (time.Time, error)      // get period time of waiting for requesting to particular service
 }
