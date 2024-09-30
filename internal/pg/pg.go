@@ -602,10 +602,7 @@ func (s Store) GetBalance(ctx context.Context, idUser string) (balance repositor
 	// получаю баланс пользователя
 	row := s.conn.QueryRowContext(ctx, query, idUser)
 	err = row.Scan(&balance.Current, &balance.Withdrawn)
-	if err != nil {
-		// запись о балансе пользователя создается сразу при регистрации, поэтому отсутствие записи это внутренняя ошибка
-		return
-	}
+	// запись о балансе пользователя создается сразу при регистрации, поэтому отсутствие записи это внутренняя ошибка
 	return
 }
 
